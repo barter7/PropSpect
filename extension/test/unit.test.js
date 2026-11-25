@@ -1,0 +1,120 @@
+// Run: node --test extension/test/unit.test.js
+// Player names here are invented test data, not a real ranking.
+const test = require('node:test');
+const assert = require('node:assert');
+const { buildIndex, findPlayers, combine, tier, badgeText, describe } = require('../src/match.js');
+const { parseList } = require('../src/parse.js');
+
+const players = [
+  { rank: 1, name: 'Dario Vance', team: 'PIT', pos: 'SS' },
+  { rank: 2, name: 'J.J. Okafor', team: 'STL', pos: '2B' },
+  { rank: 3, name: 'Jesús Marté Jr.', team: 'MIL', pos: 'SS' },
+  { rank: 4, name: "Tre' O'Malley", team: 'SEA', pos: 'OF' },
+  { rank: 5, name: 'Kai Sato-Reyes', team: 'LAD', pos: 'RHP' },
+  { rank: 60, name: 'Dario Vance Lopez', team: 'NYM', pos: 'C' },
+];
+const index = buildIndex(combine({ players }, null));
+const ranks = (title) => findPlayers(title, index).map((p) => p.mlb.rank);
+
+test('finds a name inside a noisy title', () => {
+  assert.deepStrictEqual(ranks('2025 Bowman Chrome 1st DARIO VANCE Auto Refractor /499 PSA 10 Pirates'), [1]);
+});
+test('initials match with or without dots and spaces', () => {
+  assert.deepStrictEqual(ranks('2025 Bowman JJ Okafor 1st'), [2]);
+  assert.deepStrictEqual(ranks('2025 Bowman J.J. Okafor 1st'), [2]);
+  assert.deepStrictEqual(ranks('2025 Bowman J J Okafor 1st'), [2]);
+});
+test('accents, suffixes, apostrophes and hyphens', () => {
+  assert.deepStrictEqual(ranks('Jesus Marte 2025 Bowman Draft'), [3]);
+  assert.deepStrictEqual(ranks('Jesús Marté Jr Bowman Draft'), [3]);
+  assert.deepStrictEqual(ranks('Tre OMalley sapphire'), [4]);
+  assert.deepStrictEqual(ranks('Kai Sato Reyes / Kai Sato-Reyes auto'), [5]);
+});
+test('longest name wins, and dual-player cards list both', () => {
+  assert.deepStrictEqual(ranks('Dario Vance Lopez 1st Bowman'), [60]);
+  assert.deepStrictEqual(ranks('Dual Auto JJ Okafor / Dario Vance'), [2, 1]);
+});
+test('no match on a last name alone or on unranked players', () => {
+  assert.deepStrictEqual(ranks('2025 Topps Vance Rookie'), []);
+  assert.deepStrictEqual(ranks('2024 Topps Chrome Some Veteran'), []);
+});
+
+test('parses free-form lines', () => {
+  const out = parseList('1. Dario Vance, SS, PIT\n#2 J.J. Okafor - 2B - STL\n3 Kai Sato-Reyes RHP LAD\nTre\' O\'Malley');
+  assert.deepStrictEqual(out.map((p) => [p.rank, p.name, p.team, p.pos]), [
+    [1, 'Dario Vance', 'PIT', 'SS'],
+    [2, 'J.J. Okafor', 'STL', '2B'],
+    [3, 'Kai Sato-Reyes', 'LAD', 'RHP'],
+    [4, "Tre' O'Malley", '', ''],
+  ]);
+});
+test('parses a Board-style CSV: quotes, BOM, FV, and players ranked only within their club', () => {
+  const csv = '\uFEFFName,Org,Pos,Top 100,Org Rk,FV,playerId\n"Vance, Dario","PIT","SS",1,1,"60","sa1"\n' +
+    '"J.J. Okafor","STL","2B",,4,"40+","sa2"\n"Nobody Here","BOS","C",,,"35+","sa3"\n';
+  assert.deepStrictEqual(parseList(csv), [
+    { rank: 1, name: 'Dario Vance', team: 'PIT', pos: 'SS', orgRank: 1, fv: '60', id: 'sa1' },
+    { rank: null, name: 'J.J. Okafor', team: 'STL', pos: '2B', orgRank: 4, fv: '40+', id: 'sa2' },
+  ]);
+});
+test('combines the two sources per player', () => {
+  const mlb = { players: [
+    { rank: 68, orgRank: 1, name: 'Jesús Marté', team: 'TB', pos: 'SS' },
+    { rank: null, orgRank: 3, name: 'Dario Vance', team: 'PIT', pos: 'OF' },
+    { rank: null, orgRank: 9, name: 'Kai Sato', team: 'SD', pos: 'RHP' },
+    { rank: null, orgRank: 12, name: 'Kai Sato', team: 'NYM', pos: 'C' },
+  ] };
+  const fg = { players: [
+    { rank: 44, orgRank: 2, name: 'Jesus Marte', team: 'TBR', pos: 'SS', fv: '50' },
+    { rank: null, orgRank: 7, name: 'Dario Vance', team: 'CHC', pos: 'CF', fv: '45+' }, // traded: clubs disagree
+    { rank: null, orgRank: 20, name: 'Kai Sato', team: 'NYM', pos: 'C', fv: '40' },
+    { rank: null, orgRank: 30, name: 'Pell Grantham', team: 'KCR', pos: '1B', fv: '35+' },
+  ] };
+  const all = combine(mlb, fg);
+  assert.deepStrictEqual(all.map((p) => [tier(p), badgeText(p)]), [
+    [2, 'TB SS · MLB #68 · FG 50 #44'],
+    [3, 'PIT OF · MLB org 3 · FG 45+ org 7'],
+    [4, 'SD RHP · MLB org 9'],
+    [4, 'NYM C · MLB org 12 · FG 40 org 20'],
+    [4, 'KC 1B · FG 35+ org 30'],
+  ]);
+  assert.strictEqual(describe(all[0]),
+    'Jesús Marté (TB SS)\nMLB Pipeline: #68 overall, #1 in club\nFanGraphs: 50 FV, #44 overall, #2 in club');
+  assert.deepStrictEqual(combine(null, null), []);
+  assert.strictEqual(tier(combine(null, { players: [{ rank: null, orgRank: 1, name: 'A B', team: 'X', fv: '60' }] })[0]), 1);
+});
+test('table without a rank column uses row order', () => {
+  const out = parseList('Player\tTeam\nDario Vance\tPIT\nJ.J. Okafor\tSTL');
+  assert.deepStrictEqual(out.map((p) => [p.rank, p.name, p.team]), [[1, 'Dario Vance', 'PIT'], [2, 'J.J. Okafor', 'STL']]);
+});
+
+const { parsePage, fetchRankings } = require('../src/mlb.js');
+function mlbPage(rows) {
+  const key = 'getPlayerRankingsFromSelection({"limit":30,"slug":"x"})';
+  const payload = { ROOT_QUERY: { [key]: [] } };
+  for (const [rank, id, first, last, pos] of rows) {
+    payload[`Person:${id}`] = { id, useName: first, useLastName: last, primaryPosition: { abbreviation: 'P' } };
+    payload.ROOT_QUERY[key].push({ rank, playerEntity: { position: pos, player: { __ref: `Person:${id}` } } });
+  }
+  return `<span data-init-state="${JSON.stringify({ payload }).replace(/&/g, '&amp;').replace(/"/g, '&quot;')}"></span>`;
+}
+test('reads a ranking page and merges overall and club ranks', async () => {
+  assert.deepStrictEqual(parsePage(mlbPage([[1, 11, "Tre'", "O'Malley", 'OF'], [2, 12, 'Kai', 'Sato', null]])), [
+    { id: 11, rank: 1, name: "Tre' O'Malley", pos: 'OF' },
+    { id: 12, rank: 2, name: 'Kai Sato', pos: 'P' },
+  ]);
+  const pages = {
+    top100: mlbPage([[40, 11, 'Dario', 'Vance', 'SS']]),
+    mets: mlbPage([[1, 11, 'Dario', 'Vance', 'SS'], [2, 13, 'Pell', 'Grantham', 'C']]),
+  };
+  const { players, errors } = await fetchRankings(async (url) => {
+    const slug = url.split('/').filter(Boolean).pop();
+    if (!pages[slug]) throw new Error('HTTP 404');
+    return pages[slug];
+  });
+  assert.deepStrictEqual(players, [
+    { rank: 40, orgRank: 1, name: 'Dario Vance', team: 'NYM', pos: 'SS' },
+    { rank: null, orgRank: 2, name: 'Pell Grantham', team: 'NYM', pos: 'C' },
+  ]);
+  assert.strictEqual(errors.length, 29);
+  await assert.rejects(fetchRankings(async () => { throw new Error('HTTP 500'); }), /no rankings could be read/);
+});

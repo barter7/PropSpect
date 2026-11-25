@@ -1,0 +1,17 @@
+.prk-badge {
+  display: inline-block;
+  margin: 0 6px 0 0;
+  padding: 1px 7px;
+  border-radius: 999px;
+  font: 700 12px/1.5 system-ui, -apple-system, "Segoe UI", sans-serif;
+  letter-spacing: 0.01em;
+  white-space: nowrap;
+  vertical-align: middle;
+  cursor: help;
+  color: #fff;
+  background: #5f6b7a;
+}
+.prk-badge.prk-t1 { background: #b7791f; }
+.prk-badge.prk-t2 { background: #2f855a; }
+.prk-badge.prk-t3 { background: #2b6cb0; }
+.prk-badge.prk-t4 { background: #5f6b7a; }

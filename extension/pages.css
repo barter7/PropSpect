@@ -1,0 +1,30 @@
+:root { --bg:#fff; --fg:#1a202c; --muted:#5f6b7a; --line:#d8dee6; --accent:#2b6cb0; --field:#f6f8fa; }
+@media (prefers-color-scheme: dark) {
+  :root { --bg:#16191d; --fg:#e6e9ee; --muted:#9aa5b1; --line:#333a44; --accent:#63a4e8; --field:#1f242b; }
+}
+* { box-sizing: border-box; }
+body { margin: 0; padding: 16px; background: var(--bg); color: var(--fg);
+  font: 14px/1.5 system-ui, -apple-system, "Segoe UI", sans-serif; }
+body.popup { width: 340px; }
+body.options { max-width: 760px; margin: 0 auto; padding: 24px 16px 48px; }
+h1 { font-size: 18px; margin: 0 0 4px; }
+h2 { font-size: 15px; margin: 24px 0 6px; }
+p { margin: 6px 0; }
+.muted { color: var(--muted); }
+input[type=text], input[type=search], textarea { width: 100%; padding: 8px 10px; border: 1px solid var(--line);
+  border-radius: 6px; background: var(--field); color: var(--fg); font: inherit; }
+textarea { min-height: 200px; font-family: ui-monospace, Menlo, Consolas, monospace; font-size: 13px; }
+button { padding: 7px 14px; border: 1px solid var(--line); border-radius: 6px; background: var(--field);
+  color: var(--fg); font: inherit; cursor: pointer; }
+button.primary { background: var(--accent); border-color: var(--accent); color: #fff; font-weight: 600; }
+button:disabled { opacity: 0.5; cursor: default; }
+.row { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; margin: 10px 0; }
+table { width: 100%; border-collapse: collapse; font-variant-numeric: tabular-nums; }
+th, td { text-align: left; padding: 4px 8px; border-bottom: 1px solid var(--line); }
+th { color: var(--muted); font-weight: 600; font-size: 12px; }
+.scroll { max-height: 320px; overflow: auto; border: 1px solid var(--line); border-radius: 6px; }
+ul.results { list-style: none; margin: 8px 0 0; padding: 0; }
+ul.results li { display: flex; flex-direction: column; padding: 4px 0; border-bottom: 1px solid var(--line); }
+ul.results .rk { font-weight: 700; min-width: 44px; }
+label.toggle { display: flex; gap: 8px; align-items: center; }
+details { margin: 8px 0; } summary { cursor: pointer; color: var(--muted); margin-bottom: 6px; }
