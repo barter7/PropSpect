@@ -42,6 +42,8 @@
   .pb-sort::after { content: ""; width: 0.7em; display: inline-block; }
   th[aria-sort="ascending"] .pb-sort::after { content: "▲"; font-size: 0.7em; color: var(--color-fg); }
   th[aria-sort="descending"] .pb-sort::after { content: "▼"; font-size: 0.7em; color: var(--color-fg); }
+  .pb-listbar { align-items: end; margin-bottom: 4px; }
+  .pb-listnote { margin: 0; flex: 1 1 300px; align-self: center; }
   .pb-foot { display: flex; flex-wrap: wrap; gap: var(--cds-gap-sm); align-items: center; font-size: var(--cds-font-size-caption); color: var(--color-fg-muted); margin-top: 8px; }
   .pb-detail-name { font-size: var(--cds-font-size-heading); font-weight: var(--cds-font-weight-medium); }
   .pb-detail-bio { color: var(--color-fg-muted); font-size: var(--cds-font-size-caption); margin: 2px 0 10px; line-height: 1.5; }
@@ -61,8 +63,9 @@
   </header>
 
   <section class="pb-controls" id="pb-filters" aria-label="Filters">
-    <label class="pb-field">Search player
-      <input class="pb-input" id="pb-q" type="search" placeholder="Name" autocomplete="off"></label>
+    <label class="pb-field">Player
+      <input class="pb-input" id="pb-q" type="search" list="pb-names" placeholder="Pick or type a name" autocomplete="off">
+      <datalist id="pb-names" data-draw="name-options" data-source="players"></datalist></label>
     <label class="pb-field">Who
       <select class="dash-select" id="pb-status" data-param="status">
         <option value="Current">On a current list</option>
@@ -143,7 +146,12 @@
 
   <section id="pb-players">
     <h2 class="pb-h2">Players</h2>
-    <p class="pb-note">Each row is a player's most recent list. Age is his age on that list. FV change compares his latest grade with his first. Select a column heading to sort by it.</p>
+    <div class="pb-controls pb-listbar">
+      <label class="pb-field">List
+        <select class="dash-select" id="pb-list" data-draw="list-options" data-source="players"></select></label>
+      <p class="pb-note pb-listnote" id="pb-listnote" hidden>Each player as he stood on the <b data-draw="list-name">—</b> list: team, age, level, ETA, risk, FV and ranks are from that list. Only players on it are shown, so the "Who" filter is off.</p>
+    </div>
+    <p class="pb-note" id="pb-note-latest">Each row is a player's most recent list. Age is his age on that list. FV change compares his latest grade with his first. Select a column heading to sort by it.</p>
     <div class="pb-tablewrap">
       <table class="pb-table" id="pb-table" data-source="players" data-row-key="key">
         <thead><tr>
@@ -162,7 +170,7 @@
           <th data-field="bonus" data-sort="bonus" class="pb-num"><button class="pb-sort" type="button">Bonus ($)</button></th>
           <th data-field="fv_first" data-sort="fv_first" class="pb-num"><button class="pb-sort" type="button">First FV</button></th>
           <th data-field="fv_change" data-sort="fv_change" class="pb-num"><button class="pb-sort" type="button">FV change</button></th>
-          <th data-field="last_list" data-sort="last_list"><button class="pb-sort" type="button">Latest list</button></th>
+          <th data-field="last_list" data-sort="last_list"><button class="pb-sort" type="button">List</button></th>
         </tr></thead>
         <tbody data-draw="rows"></tbody>
       </table>
@@ -187,9 +195,12 @@
   const POS = {
     pit: /P$|^TWP$/i, c: /^C(\/|$)/i, inf: /^(1B|2B|3B|SS|INF|UTIL|4C)/i, of: /^(LF|CF|RF|OF)/i,
   };
-  const DEFAULTS = { status: 'Current', team: '', pos: '', fv: '', sign: '', year: '', q: '', sort: 'fv_value', dir: 'desc', sel: '', show: 100 };
+  const DEFAULTS = { list: '', status: 'Current', team: '', pos: '', fv: '', sign: '', year: '', q: '', sort: 'fv_value', dir: 'desc', sel: '', show: 100 };
   const fold = (s) => String(s || '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase();
   const num = (v) => (v === '' || v == null || isNaN(+v) ? null : +v);
+  const listOrder = (k) => +k.slice(0, 4) * 2 + (k.endsWith('u') ? 1 : 0);
+  const listLabel = (k) => `${k.slice(0, 4)} ${k.endsWith('u') ? 'Updated' : 'Report'}`;
+  const fvValue = (fv) => (fv ? parseInt(fv, 10) + (fv.includes('+') ? 2.5 : 0) : null);
   const P = () => {
     const set = dash.params() || {}, out = {};
     for (const k in DEFAULTS) out[k] = set[k] == null ? DEFAULTS[k] : set[k];
@@ -205,14 +216,27 @@
         const o = Object.assign({}, r);
         for (const k of NUM) o[k] = num(r[k]);
         o._name = fold(r.name);
+        // What each list said about him: list:FV:club rank:Top 100:age:level:ETA:risk:team ("-" = nothing).
+        o._hist = new Map(r.history.split(' ').map((part) => {
+          const [list, fv, org, top, age, level, eta, risk, team] = part.split(':');
+          const text = (v) => (v === '-' || v == null ? '' : v);
+          return [list, { fv: text(fv), org: num(org), top: num(top), age: num(age), level: text(level), eta: num(eta), risk: text(risk), team: text(team) }];
+        }));
         return o;
       });
     }
     return cacheRows;
   }
 
+  // The player as one list showed him, or null if he was not on it.
+  function onList(r, list) {
+    const h = r._hist.get(list);
+    if (!h) return null;
+    return Object.assign({}, r, { fv: h.fv, fv_value: fvValue(h.fv), top100: h.top, org_rank: h.org, age: h.age, level: h.level,
+      eta: h.eta, risk: h.risk, org: h.team || r.org, last_list: list });
+  }
   function matches(r, p) {
-    if (p.status !== 'all' && r.status !== p.status) return false;
+    if (!p.list && p.status !== 'all' && r.status !== p.status) return false;
     if (p.team && r.org !== p.team) return false;
     if (p.sign && r.sign_type !== p.sign) return false;
     if (p.year && String(r.sign_year) !== String(p.year)) return false;
@@ -221,9 +245,11 @@
     if (p.q && !r._name.includes(fold(p.q))) return false;
     return true;
   }
-  function filtered(raw) {
-    const p = P();
-    const rows = players(raw).filter((r) => matches(r, p));
+  function filtered(raw, over) {
+    const p = Object.assign(P(), over || {});
+    let base = players(raw);
+    if (p.list) base = base.map((r) => onList(r, p.list)).filter(Boolean);
+    const rows = base.filter((r) => matches(r, p));
     const dir = p.dir === 'asc' ? 1 : -1;
     const text = !NUM.includes(p.sort);
     return rows.sort((a, b) => {
@@ -307,6 +333,31 @@
   options('team-options', 'team', 'All teams', (rows) => [...new Set(rows.map((r) => r.org).filter(Boolean))].sort());
   options('year-options', 'year', 'Any year', (rows) => [...new Set(rows.map((r) => r.sign_year).filter(Boolean))].sort().reverse());
 
+  // The player box is a dropdown of every player the other filters keep (type to narrow it).
+  dash.draw('name-options', (dl) => {
+    const s = dash.data('players');
+    if (s.status !== 'ok') { dl.replaceChildren(); return; }
+    const rows = filtered(s.data, { q: '' }).sort((a, b) => a.name.localeCompare(b.name));
+    dl.replaceChildren(...rows.map((r) => {
+      const o = document.createElement('option');
+      o.value = r.name;
+      o.label = [r.org, r.pos].filter(Boolean).join(' ');
+      return o;
+    }));
+  });
+
+  // The list chooser, newest list first, with how many players each one holds.
+  dash.draw('list-options', (sel) => {
+    const s = dash.data('players');
+    const count = new Map();
+    if (s.status === 'ok') for (const r of players(s.data)) for (const k of r._hist.keys()) count.set(k, (count.get(k) || 0) + 1);
+    const keys = [...count.keys()].sort((a, b) => listOrder(b) - listOrder(a));
+    sel.replaceChildren(new Option("Each player's latest list", ''), ...keys.map((k) => new Option(`${listLabel(k)} (${int(count.get(k))} players)`, k)));
+    sel.value = P().list || '';
+    sel.onchange = () => set({ list: sel.value || null });
+  });
+  dash.draw('list-name', (el) => { el.textContent = P().list ? listLabel(P().list) : '—'; });
+
   // Controls: each one sets a filter; a new filter starts the table back at 100 rows.
   const set = (change) => dash.setParams(Object.assign({ show: 100 }, change));
   document.querySelectorAll('#pb-filters select[data-param]').forEach((sel) => {
@@ -338,6 +389,9 @@
     document.querySelectorAll('#pb-filters select[data-param]').forEach((sel) => {
       if (document.activeElement !== sel && !sel.dataset.draw) sel.value = p[sel.dataset.param] || '';
     });
+    document.querySelectorAll('#pb-status').forEach((el) => { el.disabled = !!p.list; });
+    document.querySelectorAll('#pb-listnote').forEach((el) => { el.hidden = !p.list; });
+    document.querySelectorAll('#pb-note-latest').forEach((el) => { el.hidden = !!p.list; });
     document.querySelectorAll('#pb-sortsel').forEach((sel) => {
       const v = `${p.sort}:${p.dir}`;
       sel.value = [...sel.options].some((o) => o.value === v) ? v : '';
@@ -425,8 +479,6 @@
   });
 
   // The selected player's history: three rows on one time axis that starts at his signing year.
-  const listOrder = (k) => +k.slice(0, 4) * 2 + (k.endsWith('u') ? 1 : 0);
-  const listLabel = (k) => `${k.slice(0, 4)} ${k.endsWith('u') ? 'Updated' : 'Report'}`;
   dash.draw('detail', (box) => {
     const s = dash.data('players');
     const say = (text) => box.replaceChildren(Object.assign(document.createElement('p'), { className: 'pb-msg', textContent: text }));
@@ -447,7 +499,6 @@
     const slots = lists.length + (signed ? 1 : 0);
     const step = slots > 1 ? (W - LEFT - RIGHT) / (slots - 1) : 0;
     const x = (i) => (slots > 1 ? LEFT + (i + (signed ? 1 : 0)) * step : (LEFT + W - RIGHT) / 2);
-    const fvValue = (fv) => (fv ? parseInt(fv, 10) + (fv.includes('+') ? 2.5 : 0) : null);
     const rowsDef = [
       { title: ['Future', 'Value'], get: (p) => fvValue(p.fv), show: (p) => p.fv, high: true, none: 'No FV listed' },
       { title: ['Club', 'rank'], get: (p) => p.org, show: (p) => '#' + p.org, none: 'No club rank listed' },

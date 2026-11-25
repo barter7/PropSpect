@@ -8,3 +8,8 @@ opened as a plain file. It is kept here as the source of record.
 To refresh the dashboard after adding yearly files: run
 `node tools/build-summary.js`, then upload the new `Rankings/players.csv` to
 the dashboard's Sources panel in place of the old file.
+
+The page's player box is a pick-or-type dropdown of every player the other
+filters keep. The **List** chooser above the table shows each player as one
+list had him (FV, ranks, age, level, ETA, risk and team from that list); the
+"Who" filter does not apply while a list is chosen.

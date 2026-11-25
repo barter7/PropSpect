@@ -26,7 +26,7 @@ this from the repository root:
 | `first_list`, `last_list`, `lists` | The first and last lists he was on, and how many |
 | `fv_first`, `fv_peak`, `fv_change` | First and highest FV, and latest minus first |
 | `best_top100`, `best_org_rank` | His best rank on any list |
-| `history` | Every list he was on, as `list:FV:club rank:Top 100 rank`, `-` when unranked |
+| `history` | Every list he was on, as `list:FV:club rank:Top 100 rank:age:level:ETA:risk:team`, with `-` where that list gave nothing. The dashboard's list chooser reads it |
 | `player_id`, `key` | FanGraphs id on his latest list, and a unique key for the row |
 
 A player is followed from file to file by FanGraphs player id. When the id is

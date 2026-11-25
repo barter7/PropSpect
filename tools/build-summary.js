@@ -6,6 +6,7 @@ const fs = require('fs');
 const path = require('path');
 const History = require('../extension/src/history.js');
 const { parseList } = require('../extension/src/parse.js');
+const { normTeam } = require('../extension/src/match.js');
 
 const SRC = path.join(__dirname, '..', 'Rankings', 'fangraphs');
 const OUT = path.join(__dirname, '..', 'Rankings', 'players.csv');
@@ -13,6 +14,7 @@ const OUT = path.join(__dirname, '..', 'Rankings', 'players.csv');
 const files = fs.readdirSync(SRC).filter((f) => /\.csv$/i.test(f)).sort()
   .map((f) => ({ name: f, text: fs.readFileSync(path.join(SRC, f), 'utf8') }));
 
+const riskName = (r) => (r ? { h: 'High', m: 'Med', l: 'Low' }[r[0].toLowerCase()] || r : '');
 // Keep each player's latest non-empty value of every descriptive column, and the age on each list.
 const info = new Map();
 const history = History.buildHistory(files, parseList, (player, row, idx) => {
@@ -20,6 +22,10 @@ const history = History.buildHistory(files, parseList, (player, row, idx) => {
   const rec = info.get(player);
   for (const [k, v] of Object.entries(row.extra || {})) rec[k] = v;
   rec.ageIdx = row.extra && row.extra.age ? idx : rec.ageIdx;
+  // What each list said about him, kept for the dashboard's "show one list" view.
+  const x = row.extra || {};
+  if (!rec.byList) rec.byList = {};
+  rec.byList[idx] = { age: parseFloat(x.age), level: x.level, eta: x.eta, risk: riskName(x.risk), team: normTeam(row.team) };
   if (row.id && !rec.ids.includes(row.id)) rec.ids.push(row.id);
 });
 
@@ -61,7 +67,7 @@ const rows = history.players.map((p) => {
     age_as_of: rec.ageIdx != null ? key(rec.ageIdx) : '',
     level: rec.level || '',
     eta: rec.eta || '',
-    risk: rec.risk ? { h: 'High', m: 'Med', l: 'Low' }[rec.risk[0].toLowerCase()] || rec.risk : '',
+    risk: riskName(rec.risk),
     sign_year: p.signYr ?? '',
     sign_type: type,
     draft_year: type === 'Draft' ? p.signYr ?? '' : '',
@@ -80,8 +86,13 @@ const rows = history.players.map((p) => {
     fv_change: fvs.length ? fvs[fvs.length - 1] - fvs[0] : '',
     best_top100: best(p.pts.map((pt) => pt[3])),
     best_org_rank: best(p.pts.map((pt) => pt[2])),
-    // One entry per list he was on: list:FV:club rank:Top 100 rank ("-" when unranked).
-    history: p.pts.map((pt) => [key(pt[0]), pt[1] || '-', pt[2] ?? '-', pt[3] ?? '-'].join(':')).join(' '),
+    // One entry per list he was on, "-" where a list gave nothing:
+    // list:FV:club rank:Top 100 rank:age:level:ETA:risk:team
+    history: p.pts.map((pt) => {
+      const b = (rec.byList || {})[pt[0]] || {};
+      const t = (v) => (v == null || v === '' || Number.isNaN(v) ? '-' : String(v).replace(/[\s:]+/g, ''));
+      return [key(pt[0]), t(pt[1]), t(pt[2]), t(pt[3]), Number.isFinite(b.age) ? b.age.toFixed(1) : '-', t(b.level), t(b.eta), t(b.risk), t(b.team)].join(':');
+    }).join(' '),
     player_id: rec.ids[rec.ids.length - 1] || '',
   };
 });
