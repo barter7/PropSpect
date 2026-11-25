@@ -23,7 +23,7 @@ function render() {
     const pitchers = fg ? fg.players.filter((p) => /P$/i.test(p.pos)).length : 0;
     $('fg-current').textContent = fg
       ? `${fg.players.length} players (${fg.players.filter((p) => p.rank != null).length} with a Top 100 rank, ` +
-        `${pitchers} pitchers), ${fg.source === 'history' ? 'from the ' + fg.label + ' history file' : 'imported'} ${when(fg)}.` + (pitchers ? '' : ' No pitchers yet: add the pitchers export.')
+        `${pitchers} pitchers), ${fg.source === 'history' ? 'from the history files, ' + fg.label + ',' : 'imported'} ${when(fg)}.` + (pitchers ? '' : ' No pitchers yet: add the pitchers export.')
       : 'Nothing imported yet.';
     $('add').disabled = !parsed.length || !fg;
     const players = ProspectMatch.combine(mlb, fg);

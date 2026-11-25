@@ -8,6 +8,30 @@ Ranking files, one folder per source, one or more files per year.
 | [`mlb-pipeline/`](mlb-pipeline/) | MLB Pipeline Top 100 and club Top 30 lists |
 | [`other/`](other/) | Any other source (Baseball America, your own list, ...) |
 
+## The summary: `players.csv`
+
+`players.csv` has one row per player across every FanGraphs file here. It is
+generated; do not edit it by hand. After adding or replacing yearly files, run
+this from the repository root:
+
+    node tools/build-summary.js
+
+| Columns | Meaning |
+| --- | --- |
+| `name`, `org`, `pos`, `level`, `eta`, `risk`, `bats`, `throws`, `height`, `weight` | As on his most recent list |
+| `status` | `Current` if he is on the newest list his club appears in, else `Off lists` |
+| `fv`, `top100`, `org_rank` | Future Value, Top 100 rank and club rank on his most recent list (`fv_value` is the FV as a number, with `+` counted as 2.5) |
+| `age`, `age_as_of` | His age on a list, and which list |
+| `sign_year`, `sign_type`, `draft_year`, `draft_round`, `bonus`, `signed_from` | How and when he signed. `draft_year` is filled for drafted players only; `draft_round` only where a file gave it |
+| `first_list`, `last_list`, `lists` | The first and last lists he was on, and how many |
+| `fv_first`, `fv_peak`, `fv_change` | First and highest FV, and latest minus first |
+| `best_top100`, `best_org_rank` | His best rank on any list |
+| `history` | Every list he was on, as `list:FV:club rank:Top 100 rank`, `-` when unranked |
+| `player_id`, `key` | FanGraphs id on his latest list, and a unique key for the row |
+
+A player is followed from file to file by FanGraphs player id. When the id is
+missing or changed, he is matched by name and signing year, then club.
+
 ## Uploading
 
 On GitHub, open the folder for the source, choose **Add file > Upload files**,

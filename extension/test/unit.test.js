@@ -141,7 +141,19 @@ test('builds a timeline per player across files', () => {
     { name: 'Dario Vance', team: 'TB', pos: 'SS', signYr: 2022, pts: [[0, '40+', 12, null], [1, '50', 2, 40], [2, '55', 1, 8]] },
     { name: 'Kai Sato', team: 'NYM', pos: 'C', signYr: 2023, pts: [[1, '40', 9, null]] },
   ]);
-  assert.deepStrictEqual(History.latestList(h), [{ name: 'Dario Vance', team: 'TB', pos: 'SS', fv: '55', orgRank: 1, rank: 8 }]);
+  // Each club's current list is the newest file that club appears in.
+  assert.deepStrictEqual(History.latestList(h), [
+    { name: 'Dario Vance', team: 'TB', pos: 'SS', fv: '55', orgRank: 1, rank: 8 },
+    { name: 'Kai Sato', team: 'NYM', pos: 'C', fv: '40', orgRank: 9, rank: null },
+  ]);
+  // Namesakes with different signing years stay separate; a quoted cell may span lines.
+  const two = History.buildHistory([
+    file('2020r.csv', ['Luis Rey,LAD,SS,,5,45,2016,', '"Other, Guy",LAD,C,,9,"40",2015,"x"']),
+    file('2021r.csv', ['Luis Rey,DET,SS,,20,35+,2021,']),
+    { name: '2022r.csv', text: 'Name,Org,FV,Report,Sign Yr\nLuis Rey,DET,40,"Line one,\nline ""two""",2021\n' },
+  ], parseList);
+  assert.deepStrictEqual(two.players.map((p) => [p.name, p.team, p.signYr, p.pts.length]),
+    [['Luis Rey', 'LAD', 2016, 1], ['Guy Other', 'LAD', 2015, 1], ['Luis Rey', 'DET', 2021, 2]]);
   const index = History.indexHistory(h);
   assert.strictEqual(History.lookup(index, { name: 'DARIO VANCE', team: 'TB' }).signYr, 2022);
   assert.strictEqual(History.lookup(index, { name: 'Nobody', team: 'TB' }), null);

@@ -19,21 +19,26 @@
     signYr: /^(sign ?yr|sign ?year|signed|signing year)$/,
   };
 
-  function splitRow(line, delim) {
-    const cells = [];
-    let cur = '', quoted = false;
-    for (let i = 0; i < line.length; i++) {
-      const ch = line[i];
+  // Splits delimited text into rows of cells. Quoted cells may hold the
+  // delimiter, doubled quotes and line breaks (scouting reports do).
+  function readTable(text, delim) {
+    const rows = [];
+    let row = [], cur = '', quoted = false;
+    const endCell = () => { row.push(cur.trim()); cur = ''; };
+    const endRow = () => { endCell(); if (row.some((c) => c !== '')) rows.push(row); row = []; };
+    for (let i = 0; i < text.length; i++) {
+      const ch = text[i];
       if (quoted) {
-        if (ch === '"' && line[i + 1] === '"') { cur += '"'; i++; }
+        if (ch === '"' && text[i + 1] === '"') { cur += '"'; i++; }
         else if (ch === '"') quoted = false;
         else cur += ch;
       } else if (ch === '"') quoted = true;
-      else if (ch === delim) { cells.push(cur.trim()); cur = ''; }
-      else cur += ch;
+      else if (ch === delim) endCell();
+      else if (ch === '\n') endRow();
+      else if (ch !== '\r') cur += ch;
     }
-    cells.push(cur.trim());
-    return cells;
+    if (cur !== '' || row.length) endRow();
+    return rows;
   }
 
   function cleanName(name) {
@@ -50,21 +55,30 @@
 
   const toYear = (v) => { const m = /(19|20)\d{2}/.exec(String(v || '')); return m ? +m[0] : null; };
 
-  function parseTable(lines, delim) {
-    const header = splitRow(lines[0], delim).map((h) => h.replace(/^﻿/, '').toLowerCase().trim());
+  // Columns kept as plain text when present (used by the summary builder).
+  const EXTRA = {
+    age: /^age$/, level: /^(current level|level|lvl)$/, eta: /^eta$/, risk: /^risk$/, trend: /^trend$/,
+    signMkt: /^sign mkt$/, signOrg: /^sign org$/, bonus: /^bonus$/, signedFrom: /^signed from$/,
+    signed: /^signed$/, bats: /^b$/, throws: /^t$/, ht: /^ht$/, wt: /^wt$/,
+  };
+
+  function parseTable(text, delim) {
+    const table = readTable(text, delim);
+    if (!table.length) return null;
+    const header = table[0].map((h) => h.replace(/^\uFEFF/, '').toLowerCase().trim());
     const col = {};
     for (const key of Object.keys(COLS)) col[key] = header.findIndex((h) => COLS[key].test(h));
     if (col.name < 0) return null;
+    const extra = Object.keys(EXTRA).map((key) => [key, header.findIndex((h) => EXTRA[key].test(h))]).filter((e) => e[1] >= 0);
     const players = [];
-    for (const line of lines.slice(1)) {
-      const cells = splitRow(line, delim);
+    for (const cells of table.slice(1)) {
       const name = cleanName(cells[col.name]);
       if (!name) continue;
       const rank = col.rank >= 0 ? toRank(cells[col.rank]) : players.length + 1;
       const orgRank = col.orgRank >= 0 ? toRank(cells[col.orgRank]) : null;
       const fv = col.fv >= 0 ? cells[col.fv] || '' : '';
       if (rank == null && orgRank == null && !fv) continue; // listed but ungraded and unranked
-      players.push({
+      const player = {
         rank,
         name,
         team: col.team >= 0 ? cells[col.team] || '' : '',
@@ -73,7 +87,12 @@
         fv,
         id: col.id >= 0 ? cells[col.id] || '' : '',
         signYr: col.signYr >= 0 ? toYear(cells[col.signYr]) : null,
-      });
+      };
+      if (extra.length) {
+        player.extra = {};
+        for (const [key, i] of extra) if (cells[i]) player.extra[key] = cells[i];
+      }
+      players.push(player);
     }
     return players;
   }
@@ -106,7 +125,7 @@
     if (!lines.length) return [];
     for (const delim of ['\t', ',']) {
       if (!lines[0].includes(delim)) continue;
-      const players = parseTable(lines, delim);
+      const players = parseTable(String(text), delim);
       if (players) return finish(players);
     }
     const players = [];

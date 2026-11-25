@@ -49,7 +49,7 @@ async function saveHistory(files, source, auto) {
   // A list the user imported by hand is only replaced when they ask for a history load themselves.
   if (!auto || !fg || fg.source === 'history') {
     const latest = history.snapshots[history.snapshots.length - 1];
-    update.fg = { updatedAt: Date.now(), source: 'history', label: ProspectHistory.snapshotLabel(latest), players: ProspectHistory.latestList(history) };
+    update.fg = { updatedAt: Date.now(), source: 'history', label: 'through ' + ProspectHistory.snapshotLabel(latest), players: ProspectHistory.latestList(history) };
   }
   await chrome.storage.local.set(update);
   return { snapshots: history.snapshots.map((s) => s.key), players: history.players.length, skipped: history.skipped };

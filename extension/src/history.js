@@ -19,7 +19,8 @@
   // files: [{ name, text }]. Returns
   // { snapshots: [{ key, year, type }], players: [{ name, team, pos, signYr, pts }], skipped: [names] }
   // where pts is [[snapshotIndex, fv, orgRank, top100Rank], ...] in time order.
-  function buildHistory(files, parseList) {
+  // onPoint(player, row, snapshotIndex), if given, sees every row as it is placed.
+  function buildHistory(files, parseList, onPoint) {
     const byKey = new Map();
     const skipped = [];
     for (const f of files) {
@@ -40,7 +41,9 @@
         let p = row.id ? byId.get(row.id) : null;
         if (!p) {
           // FanGraphs ids change when a player reaches the majors, so fall back to the name.
-          const open = (byName.get(nameKey) || []).filter((c) => !seen(c));
+          // Namesakes are kept apart by signing year, then by club.
+          const open = (byName.get(nameKey) || [])
+            .filter((c) => !seen(c) && !(c.signYr && row.signYr && c.signYr !== row.signYr));
           p = open.find((c) => c.team === team) || (open.length === 1 ? open[0] : null);
         }
         if (p && seen(p)) continue; // the same player twice in one snapshot
@@ -54,18 +57,30 @@
         p.name = row.name; p.team = team; p.pos = row.pos || p.pos;
         if (row.signYr) p.signYr = row.signYr;
         p.pts.push([idx, row.fv || '', row.orgRank, row.rank]);
+        if (onPoint) onPoint(p, row, idx);
       }
     });
     return { snapshots: snaps.map(({ key, year, type }) => ({ key, year, type })), players, skipped };
   }
 
-  // The newest snapshot as a plain ranking list, for the badge's FanGraphs part.
+  // FanGraphs revises one club at a time, so the newest file can hold only a few
+  // clubs. A club's current list is the newest file that club appears in.
+  function currentIndexByTeam(history) {
+    const latest = new Map();
+    for (const p of history.players) {
+      const idx = p.pts[p.pts.length - 1][0];
+      if (!(latest.get(p.team) >= idx)) latest.set(p.team, idx);
+    }
+    return latest;
+  }
+
+  // Every player on his club's current list, as a plain ranking list for the badge's FanGraphs part.
   function latestList(history) {
-    const last = history.snapshots.length - 1;
+    const latest = currentIndexByTeam(history);
     const out = [];
     for (const p of history.players) {
       const pt = p.pts[p.pts.length - 1];
-      if (pt[0] !== last) continue;
+      if (pt[0] !== latest.get(p.team)) continue;
       out.push({ name: p.name, team: p.team, pos: p.pos, fv: pt[1], orgRank: pt[2], rank: pt[3] });
     }
     return out;
@@ -87,7 +102,7 @@
     return list.find((p) => p.team === player.team) || list[0] || null;
   }
 
-  const api = { parseFileName, snapshotLabel, buildHistory, latestList, indexHistory, lookup };
+  const api = { parseFileName, snapshotLabel, buildHistory, currentIndexByTeam, latestList, indexHistory, lookup };
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
   else root.ProspectHistory = api;
 })(typeof globalThis !== 'undefined' ? globalThis : this);

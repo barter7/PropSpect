@@ -160,7 +160,7 @@ const HISTORY = {
     await mgr.waitForFunction(() => /^(Loaded|History not loaded)/.test(document.getElementById('hist-status').textContent));
     assert.strictEqual(await mgr.locator('#hist-status').innerText(),
       'Loaded 6 lists (2023r, 2023u, 2024r, 2024u, 2025r, 2025u), 3 players.');
-    assert.match(await mgr.locator('#fg-current').innerText(), /^2 players .* from the 2025 Updated history file/);
+    assert.match(await mgr.locator('#fg-current').innerText(), /^3 players .* from the history files, through 2025 Updated,/);
     await page.bringToFront();
     await page.waitForFunction(() => document.querySelector('.prk-badge').textContent === 'PIT SS · MLB #1 · FG 60 #2');
     await page.locator('.prk-badge').first().hover();
