@@ -1,0 +1,53 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>Prospect Rank: rankings</title>
+  <link rel="stylesheet" href="pages.css">
+</head>
+<body class="options">
+  <h1>Prospect Rank: rankings</h1>
+  <p class="muted">Badges on eBay combine both sources below. Either one works on its own.</p>
+
+  <h2>MLB Pipeline</h2>
+  <p class="muted" id="mlb-current"></p>
+  <p>Loads the Top 100 and every club's Top 30 from MLB.com, then refreshes them weekly.</p>
+  <div class="row">
+    <button class="primary" id="sync">Sync from MLB Pipeline</button>
+    <button id="mlb-clear">Remove</button>
+    <span class="muted" id="sync-status"></span>
+  </div>
+
+  <h2>FanGraphs: The Board</h2>
+  <p class="muted" id="fg-current"></p>
+  <p>On The Board, use <strong>Export Data</strong> and load the CSV here. The hitters and pitchers
+     views export separately, so select both files at once, or load one and then <em>add</em> the other.
+     The columns used are <code>Name</code>, <code>Org</code>, <code>Pos</code>, <code>Top 100</code>,
+     <code>Org Rk</code> and <code>FV</code>. Re-export and load again whenever The Board is updated.</p>
+  <div class="row">
+    <input type="file" id="file" accept=".csv,.tsv,.txt,text/csv,text/plain" multiple>
+  </div>
+  <details>
+    <summary>Or paste a CSV or a plain list</summary>
+    <textarea id="text" placeholder="Name,Org,Pos,Top 100,Org Rk,FV&#10;..."></textarea>
+  </details>
+  <div class="row">
+    <button class="primary" id="save" disabled>Save (replace)</button>
+    <button id="add" disabled>Add to saved list</button>
+    <button id="fg-clear">Remove</button>
+    <span class="muted" id="status"></span>
+  </div>
+
+  <h2 id="preview-title">Combined rankings</h2>
+  <div class="scroll">
+    <table>
+      <thead><tr><th>Player</th><th>Club</th><th>Pos</th><th>MLB</th><th>MLB club</th><th>FG FV</th><th>FG</th><th>FG club</th></tr></thead>
+      <tbody id="preview"></tbody>
+    </table>
+  </div>
+
+  <script src="src/match.js"></script>
+  <script src="src/parse.js"></script>
+  <script src="options.js"></script>
+</body>
+</html>
