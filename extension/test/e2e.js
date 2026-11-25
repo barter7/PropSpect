@@ -35,6 +35,19 @@ const FG_HITTERS = 'Name,Org,Pos,Top 100,Org Rk,FV,playerId\n"Dario Vance","PIT"
   '"Tre\' O\'Malley","SEA","CF",,9,"40+","sa4"\n';
 const FG_PITCHERS = 'Name,Org,Pos,Top 100,Org Rk,FV,playerId\n"Kai Sato-Reyes","LAD","SP",30,2,"50","sa5"\n';
 
+// Yearly history files as they would sit in the repository's Rankings/ folder.
+const HEAD = 'Name,Org,Pos,Top 100,Org Rk,FV,Sign Yr,playerId\n';
+const HISTORY = {
+  'Rankings/fangraphs/2023r.csv': HEAD + 'Dario Vance,PIT,SS,,14,40+,2021,sa1\nKai Sato-Reyes,LAD,SP,95,6,50,2020,sa5\n',
+  'Rankings/fangraphs/2023u.csv': HEAD + 'Dario Vance,PIT,SS,,8,45,2021,sa1\nKai Sato-Reyes,LAD,SP,70,4,50,2020,sa5\n',
+  'Rankings/fangraphs/2024r.csv': HEAD + 'Dario Vance,PIT,SS,88,4,50,2021,sa1\nKai Sato-Reyes,LAD,SP,64,3,50,2020,sa5\n',
+  'Rankings/fangraphs/2024u.csv': HEAD + 'Dario Vance,PIT,SS,41,2,55,2021,sa1\nJ.J. Okafor,STL,2B,,9,40,2024,sa2\n',
+  'Rankings/fangraphs/2025r.csv': HEAD + 'Dario Vance,PIT,SS,12,1,60,2021,sa1\nJ.J. Okafor,STL,2B,,6,45,2024,sa2\n',
+  'Rankings/fangraphs/2025u.csv': HEAD + 'Dario Vance,PIT,SS,2,1,60,2021,9001\nJ.J. Okafor,STL,2B,,4,45+,2024,sa2\n',
+  'Rankings/README.md': 'not a ranking file',
+  'Rankings/other/2025r.csv': HEAD + 'Wrong Source,BOS,C,1,1,80,2020,x\n',
+};
+
 (async () => {
   const profile = fs.mkdtempSync(path.join(os.tmpdir(), 'prk-'));
   const ctx = await chromium.launchPersistentContext(profile, {
@@ -53,6 +66,14 @@ const FG_PITCHERS = 'Name,Org,Pos,Top 100,Org Rk,FV,playerId\n"Kai Sato-Reyes","
       const file = MLB_DIR && path.join(MLB_DIR, slug + '.html');
       const body = file ? (fs.existsSync(file) ? fs.readFileSync(file, 'utf8') : null) : MLB_PAGES[slug];
       return body ? route.fulfill({ contentType: 'text/html', body }) : route.fulfill({ status: 404, body: 'no' });
+    });
+    await ctx.route(/api\.github\.com/, (route) => route.fulfill({
+      contentType: 'application/json',
+      body: JSON.stringify({ tree: Object.keys(HISTORY).map((p) => ({ path: p, type: 'blob' })) }),
+    }));
+    await ctx.route(/raw\.githubusercontent\.com/, (route) => {
+      const p = decodeURIComponent(new URL(route.request().url()).pathname).split('/').slice(4).join('/');
+      return HISTORY[p] ? route.fulfill({ contentType: 'text/plain', body: HISTORY[p] }) : route.fulfill({ status: 404, body: '' });
     });
     const page = await ctx.newPage();
     await page.goto('https://www.ebay.com/sch/i.html?_nkw=bowman+chrome+auto');
@@ -117,7 +138,12 @@ const FG_PITCHERS = 'Name,Org,Pos,Top 100,Org Rk,FV,playerId\n"Kai Sato-Reyes","
       'LAD RHP · MLB #77 · FG 50 #30', 'PIT SS · MLB #1 · FG 60 #2', 'PIT C · MLB org 5', 'SEA CF · FG 40+ org 9',
     ]);
     const tip = await page.locator('.prk-badge').first().getAttribute('title');
-    assert.match(tip, /^Dario Vance \(PIT SS\)\nMLB Pipeline: #1 overall, #1 in club\nFanGraphs: 60 FV, #2 overall, #1 in club\nMLB updated/);
+    // Hovering a badge opens a card with both sources' ranks.
+    await page.locator('.prk-badge').first().hover();
+    assert.match(await page.locator('.prk-card').innerText(),
+      /^Dario Vance \(PIT SS\)\nMLB Pipeline: #1 overall, #1 in club\nFanGraphs: 60 FV, #2 overall, #1 in club\nMLB updated/);
+    assert.strictEqual(await page.locator('.prk-card svg').count(), 0, 'no chart before history is loaded');
+    await page.mouse.move(700, 500);
 
     // Popup lookup and the on/off switch.
     await mgr.goto(`chrome-extension://${id}/popup.html`);
@@ -127,7 +153,28 @@ const FG_PITCHERS = 'Name,Org,Pos,Top 100,Org Rk,FV,playerId\n"Kai Sato-Reyes","
     await page.waitForFunction(() => document.querySelectorAll('.prk-badge').length === 0);
     await mgr.check('#enabled');
     await page.waitForFunction(() => document.querySelectorAll('.prk-badge').length === 7);
+
+    // Ranking history from the repository's yearly files, charted in the hover card.
+    await mgr.goto(`chrome-extension://${id}/options.html`);
+    await mgr.click('#hist-sync');
+    await mgr.waitForFunction(() => /^(Loaded|History not loaded)/.test(document.getElementById('hist-status').textContent));
+    assert.strictEqual(await mgr.locator('#hist-status').innerText(),
+      'Loaded 6 lists (2023r, 2023u, 2024r, 2024u, 2025r, 2025u), 3 players.');
+    assert.match(await mgr.locator('#fg-current').innerText(), /^2 players .* from the 2025 Updated history file/);
+    await page.bringToFront();
+    await page.waitForFunction(() => document.querySelector('.prk-badge').textContent === 'PIT SS · MLB #1 · FG 60 #2');
+    await page.locator('.prk-badge').first().hover();
+    await page.waitForSelector('.prk-card svg');
+    assert.strictEqual(await page.locator('.prk-card .prk-readout').innerText(), '2025 Updated: 60 FV · club #1 · Top 100 #2');
+    const ticks = await page.$$eval('.prk-card .prk-tick', (els) => els.map((x) => x.textContent));
+    assert.deepStrictEqual(ticks, ['2021', 'Signed', '2023', 'First listed', '2023U', '2024', '2024U', '2025', '2025U']);
+    assert.strictEqual(await page.locator('.prk-card .prk-dot').count(), 6 + 6 + 4, 'FV and club rank every list, Top 100 from 2024');
+    // Moving onto the card keeps it open; pointing at a list shows that list's values.
+    await page.locator('.prk-card .prk-hit').nth(1).hover();
+    assert.strictEqual(await page.locator('.prk-card .prk-readout').innerText(), '2023 Updated: 45 FV · club #8 · not in Top 100');
     if (process.argv[2]) await page.screenshot({ path: process.argv[2] });
+    await page.mouse.move(780, 540);
+    await page.waitForFunction(() => !document.querySelector('.prk-card'));
     console.log('e2e passed:', badges.join(' | '));
   } finally {
     await ctx.close();

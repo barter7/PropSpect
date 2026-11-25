@@ -52,8 +52,9 @@ test('parses a Board-style CSV: quotes, BOM, FV, and players ranked only within 
   const csv = '\uFEFFName,Org,Pos,Top 100,Org Rk,FV,playerId\n"Vance, Dario","PIT","SS",1,1,"60","sa1"\n' +
     '"J.J. Okafor","STL","2B",,4,"40+","sa2"\n"Nobody Here","BOS","C",,,"35+","sa3"\n';
   assert.deepStrictEqual(parseList(csv), [
-    { rank: 1, name: 'Dario Vance', team: 'PIT', pos: 'SS', orgRank: 1, fv: '60', id: 'sa1' },
-    { rank: null, name: 'J.J. Okafor', team: 'STL', pos: '2B', orgRank: 4, fv: '40+', id: 'sa2' },
+    { rank: 1, name: 'Dario Vance', team: 'PIT', pos: 'SS', orgRank: 1, fv: '60', id: 'sa1', signYr: null },
+    { rank: null, name: 'J.J. Okafor', team: 'STL', pos: '2B', orgRank: 4, fv: '40+', id: 'sa2', signYr: null },
+    { rank: null, name: 'Nobody Here', team: 'BOS', pos: 'C', orgRank: null, fv: '35+', id: 'sa3', signYr: null },
   ]);
 });
 test('combines the two sources per player', () => {
@@ -117,4 +118,31 @@ test('reads a ranking page and merges overall and club ranks', async () => {
   ]);
   assert.strictEqual(errors.length, 29);
   await assert.rejects(fetchRankings(async () => { throw new Error('HTTP 500'); }), /no rankings could be read/);
+});
+
+const History = require('../src/history.js');
+test('reads the year and Report/Updated from a file name', () => {
+  const key = (n) => (History.parseFileName(n) || {}).key;
+  assert.deepStrictEqual(['2026r.csv', 'Rankings/fangraphs/2025u.csv', '2024U.CSV', 'fg-2023-board-r.csv', '2022 u.csv'].map(key),
+    ['2026r', '2025u', '2024u', '2023r', '2022u']);
+  assert.deepStrictEqual(['2026-pitcher.csv', '2026-hitters.csv', 'notes-r.csv', '20261r.csv'].map(key), [undefined, undefined, undefined, undefined]);
+});
+test('builds a timeline per player across files', () => {
+  const file = (name, rows) => ({ name, text: 'Name,Org,Pos,Top 100,Org Rk,FV,Sign Yr,playerId\n' + rows.join('\n') });
+  const h = History.buildHistory([
+    file('2025u.csv', ['Dario Vance,TBR,SS,40,2,50,2022,sa1', 'Kai Sato,NYM,C,,9,40,7/2/2023,sa9']),
+    file('2024r.csv', ['Dario Vance,PIT,SS,,12,40+,2022,sa1']),
+    file('2026r.csv', ['Dario Vance,TB,SS,8,1,55,2022,777']), // id changed on reaching the majors
+    file('readme.csv', []),
+  ], parseList);
+  assert.deepStrictEqual(h.snapshots.map((s) => s.key), ['2024r', '2025u', '2026r']);
+  assert.deepStrictEqual(h.skipped, ['readme.csv']);
+  assert.deepStrictEqual(h.players, [
+    { name: 'Dario Vance', team: 'TB', pos: 'SS', signYr: 2022, pts: [[0, '40+', 12, null], [1, '50', 2, 40], [2, '55', 1, 8]] },
+    { name: 'Kai Sato', team: 'NYM', pos: 'C', signYr: 2023, pts: [[1, '40', 9, null]] },
+  ]);
+  assert.deepStrictEqual(History.latestList(h), [{ name: 'Dario Vance', team: 'TB', pos: 'SS', fv: '55', orgRank: 1, rank: 8 }]);
+  const index = History.indexHistory(h);
+  assert.strictEqual(History.lookup(index, { name: 'DARIO VANCE', team: 'TB' }).signYr, 2022);
+  assert.strictEqual(History.lookup(index, { name: 'Nobody', team: 'TB' }), null);
 });

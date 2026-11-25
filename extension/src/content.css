@@ -15,3 +15,14 @@
 .prk-badge.prk-t2 { background: #2f855a; }
 .prk-badge.prk-t3 { background: #2b6cb0; }
 .prk-badge.prk-t4 { background: #5f6b7a; }
+.prk-badge { cursor: default; }
+.prk-card {
+  position: fixed; z-index: 2147483647; width: 372px; padding: 12px 14px; box-sizing: border-box;
+  background: #ffffff; color: #191919; border: 1px solid #d8dee6; border-radius: 10px;
+  box-shadow: 0 6px 24px rgba(0, 0, 0, 0.18); text-align: left; white-space: normal;
+  font: 12px/1.45 system-ui, -apple-system, "Segoe UI", sans-serif;
+}
+.prk-card-name { font-size: 14px; font-weight: 700; margin-bottom: 2px; }
+.prk-card-line { color: #191919; }
+.prk-card .prk-chart { margin-top: 10px; padding-top: 10px; border-top: 1px solid #e6e6e6; }
+.prk-card-foot { margin-top: 8px; color: #666666; font-size: 11px; }

@@ -1,5 +1,7 @@
 const $ = (id) => document.getElementById(id);
 let players = [];
+let history = null;
+let historyIndex = new Map();
 
 function search() {
   const q = ProspectMatch.tokenize($('q').value).join(' ');
@@ -22,11 +24,22 @@ function search() {
     const info = document.createElement('span');
     info.textContent = ProspectMatch.badgeText(p);
     li.append(name, info);
+    const hist = ProspectHistory.lookup(historyIndex, p);
+    if (hist) {
+      li.classList.add('has-history');
+      li.addEventListener('click', () => {
+        const open = li.querySelector('.prk-chart');
+        if (open) open.remove(); else li.appendChild(ProspectChart.render(document, history, hist));
+      });
+      if (hits.length === 1) li.appendChild(ProspectChart.render(document, history, hist));
+    }
     ul.appendChild(li);
   }
 }
 
-chrome.storage.local.get(['mlb', 'fg', 'enabled'], ({ mlb, fg, enabled }) => {
+chrome.storage.local.get(['mlb', 'fg', 'history', 'enabled'], ({ mlb, fg, history: h, enabled }) => {
+  history = h || null;
+  historyIndex = ProspectHistory.indexHistory(history);
   players = ProspectMatch.combine(mlb, fg);
   $('enabled').checked = enabled !== false;
   const day = (l) => new Date(l.updatedAt).toLocaleDateString();

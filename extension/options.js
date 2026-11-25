@@ -11,7 +11,11 @@ function dedupe(players) {
 }
 
 function render() {
-  chrome.storage.local.get(['mlb', 'fg'], ({ mlb, fg }) => {
+  chrome.storage.local.get(['mlb', 'fg', 'history'], ({ mlb, fg, history }) => {
+    $('hist-current').textContent = history
+      ? `${history.players.length} players across ${history.snapshots.length} lists (${history.snapshots.map((s) => s.key).join(', ')}), ` +
+        `from ${history.source}, loaded ${when(history)}.`
+      : 'No history loaded yet.';
     $('mlb-current').textContent = mlb
       ? `${mlb.players.length} players (${mlb.players.filter((p) => p.rank != null).length} in the Top 100), updated ${when(mlb)}.` +
         (mlb.errors && mlb.errors.length ? ` Could not read: ${mlb.errors.join('; ')}.` : '')
@@ -19,7 +23,7 @@ function render() {
     const pitchers = fg ? fg.players.filter((p) => /P$/i.test(p.pos)).length : 0;
     $('fg-current').textContent = fg
       ? `${fg.players.length} players (${fg.players.filter((p) => p.rank != null).length} with a Top 100 rank, ` +
-        `${pitchers} pitchers), imported ${when(fg)}.` + (pitchers ? '' : ' No pitchers yet: add the pitchers export.')
+        `${pitchers} pitchers), ${fg.source === 'history' ? 'from the ' + fg.label + ' history file' : 'imported'} ${when(fg)}.` + (pitchers ? '' : ' No pitchers yet: add the pitchers export.')
       : 'Nothing imported yet.';
     $('add').disabled = !parsed.length || !fg;
     const players = ProspectMatch.combine(mlb, fg);
@@ -56,7 +60,7 @@ $('file').addEventListener('change', async (e) => {
 $('text').addEventListener('input', () => setParsed(ProspectParse.parseList($('text').value)));
 
 function saveFg(players, note) {
-  chrome.storage.local.set({ fg: { updatedAt: Date.now(), players } }, () => {
+  chrome.storage.local.set({ fg: { updatedAt: Date.now(), source: 'manual', label: 'import', players } }, () => {
     parsed = [];
     $('save').disabled = true;
     $('file').value = '';
@@ -92,5 +96,28 @@ $('sync').addEventListener('click', () => {
     render();
   });
 });
+
+function historyDone(res) {
+  $('hist-sync').disabled = false;
+  $('hist-status').textContent = res && res.ok
+    ? `Loaded ${res.snapshots.length} lists (${res.snapshots.join(', ')}), ${res.players} players.` +
+      (res.skipped.length ? ` Skipped (no year plus r/u in the name): ${res.skipped.join(', ')}.` : '')
+    : 'History not loaded: ' + ((res && res.error) || 'no response') + '.';
+  render();
+}
+$('hist-sync').addEventListener('click', () => {
+  $('hist-sync').disabled = true;
+  $('hist-status').textContent = 'Reading the ranking files from GitHub...';
+  chrome.runtime.sendMessage({ type: 'prk-history-sync' }, historyDone);
+});
+$('hist-files').addEventListener('change', async (e) => {
+  const files = await Promise.all([...e.target.files].map(async (f) => ({ name: f.name, text: await f.text() })));
+  if (files.length) chrome.runtime.sendMessage({ type: 'prk-history-files', files }, historyDone);
+  e.target.value = '';
+});
+$('hist-clear').addEventListener('click', () => chrome.storage.local.remove('history', () => {
+  $('hist-status').textContent = 'History removed.';
+  render();
+}));
 
 render();

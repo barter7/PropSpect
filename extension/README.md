@@ -35,7 +35,8 @@ list (`1. First Last, SS, PIT`), is accepted in the same slot.
 
 The two lists are joined per player by name and club (club codes such as
 `TBR`/`TB` are reconciled). Everything stays in your browser's local storage;
-the only site the extension contacts is www.mlb.com.
+the extension contacts only www.mlb.com (rankings) and GitHub (this
+repository's ranking files).
 
 ## Reading a badge
 
@@ -50,6 +51,27 @@ the only site the extension contacts is www.mlb.com.
 - Colour is the better of the two views: gold for a top-10 rank or 60+ FV,
   green for top 50 or 50+ FV, blue for top 100 or 45/45+ FV, grey otherwise.
 - Hover for both sources' overall and club ranks and the dates of the data.
+
+## Ranking history
+
+Hover a badge to open a card with both sources' ranks and, when history is
+loaded, a chart of the player's **Future Value**, **club rank** and **Top 100
+rank** across every FanGraphs list he has been on. The time axis starts at the
+year he signed, then runs from the first list he appeared on. Point at a list
+on the chart to read its values. The popup's player lookup shows the same
+chart.
+
+History comes from the yearly files in this repository's `Rankings/` folder,
+named `<year>r.csv` (Report) and `<year>u.csv` (Updated); see
+[`../Rankings/README.md`](../Rankings/README.md). In the rankings page:
+
+- **Sync history from GitHub** reads the files from the repository's `main`
+  branch (`REPO` and `REF` at the top of `src/background.js`) and re-reads
+  them weekly.
+- **Load files from this computer** builds the same history from files you
+  pick, without GitHub.
+
+Either way the newest list also becomes the FanGraphs part of the badge.
 
 ## Matching
 

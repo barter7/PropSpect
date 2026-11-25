@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "Prospect Rank for eBay",
-  "version": "0.3.0",
+  "version": "0.4.0",
   "description": "Shows a baseball prospect's ranking next to their name in eBay card listings.",
   "permissions": [
     "storage",
@@ -21,16 +21,21 @@
       ],
       "js": [
         "src/match.js",
+        "src/history.js",
+        "src/chart.js",
         "src/content.js"
       ],
       "css": [
-        "src/content.css"
+        "src/content.css",
+        "src/chart.css"
       ],
       "run_at": "document_idle"
     }
   ],
   "host_permissions": [
-    "https://www.mlb.com/*"
+    "https://www.mlb.com/*",
+    "https://api.github.com/*",
+    "https://raw.githubusercontent.com/*"
   ],
   "background": {
     "service_worker": "src/background.js"

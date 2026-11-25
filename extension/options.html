@@ -38,6 +38,20 @@
     <span class="muted" id="status"></span>
   </div>
 
+  <h2>Ranking history</h2>
+  <p class="muted" id="hist-current"></p>
+  <p>Builds each player's history from the yearly FanGraphs files, named with the year and ending in
+     <code>r</code> (Report) or <code>u</code> (Updated): <code>2025r.csv</code>, <code>2025u.csv</code>.
+     The newest file also becomes the FanGraphs list above. Hover a badge on eBay to see the chart.</p>
+  <div class="row">
+    <button class="primary" id="hist-sync">Sync history from GitHub</button>
+    <label>or load files from this computer: <input type="file" id="hist-files" accept=".csv,text/csv" multiple></label>
+  </div>
+  <div class="row">
+    <button id="hist-clear">Remove</button>
+    <span class="muted" id="hist-status"></span>
+  </div>
+
   <h2 id="preview-title">Combined rankings</h2>
   <div class="scroll">
     <table>

@@ -12,6 +12,8 @@
   let index = new Map();
   let list = null; // combined players, or null when no rankings are saved
   let updatedNote = '';
+  let history = null;
+  let historyIndex = new Map();
   let enabled = true;
 
   function titleElements() {
@@ -41,8 +43,50 @@
     const badge = document.createElement('span');
     badge.className = `${BADGE} prk-t${ProspectMatch.tier(p)}`;
     badge.textContent = ProspectMatch.badgeText(p);
-    badge.title = ProspectMatch.describe(p) + updatedNote;
+    badge.addEventListener('mouseenter', () => showCard(badge, p));
+    badge.addEventListener('mouseleave', hideCardSoon);
     return badge;
+  }
+
+  // The hover card: both sources' ranks, then the player's history chart when there is one.
+  let card = null;
+  let hideTimer = null;
+  function hideCardSoon() {
+    clearTimeout(hideTimer);
+    hideTimer = setTimeout(() => { if (card) { card.remove(); card = null; } }, 180);
+  }
+  function showCard(badge, p) {
+    clearTimeout(hideTimer);
+    if (card) card.remove();
+    card = document.createElement('div');
+    card.className = 'prk-card';
+    const [head, ...lines] = ProspectMatch.describe(p).split('\n');
+    const h = document.createElement('div');
+    h.className = 'prk-card-name';
+    h.textContent = head;
+    card.appendChild(h);
+    for (const line of lines) {
+      const d = document.createElement('div');
+      d.className = 'prk-card-line';
+      d.textContent = line;
+      card.appendChild(d);
+    }
+    const hist = ProspectHistory.lookup(historyIndex, p);
+    if (hist) card.appendChild(ProspectChart.render(document, history, hist));
+    const note = document.createElement('div');
+    note.className = 'prk-card-foot';
+    note.textContent = updatedNote.trim() + (hist ? '' : history ? ' · No history for this player' : '');
+    card.appendChild(note);
+    card.addEventListener('mouseenter', () => clearTimeout(hideTimer));
+    card.addEventListener('mouseleave', hideCardSoon);
+    card.addEventListener('click', (e) => { e.preventDefault(); e.stopPropagation(); });
+    document.body.appendChild(card);
+    const r = badge.getBoundingClientRect();
+    const w = card.offsetWidth, hgt = card.offsetHeight;
+    const left = Math.max(8, Math.min(r.left, window.innerWidth - w - 8));
+    const below = r.bottom + 6 + hgt <= window.innerHeight || r.top < hgt + 6;
+    card.style.left = left + 'px';
+    card.style.top = (below ? r.bottom + 6 : r.top - hgt - 6) + 'px';
   }
 
   function scan() {
@@ -65,13 +109,15 @@
   }
 
   function load() {
-    chrome.storage.local.get(['mlb', 'fg', 'enabled'], (data) => {
+    chrome.storage.local.get(['mlb', 'fg', 'history', 'enabled'], (data) => {
+      history = data.history || null;
+      historyIndex = ProspectHistory.indexHistory(history);
       const players = ProspectMatch.combine(data.mlb, data.fg);
       list = players.length ? players : null;
       enabled = data.enabled !== false;
       index = ProspectMatch.buildIndex(players);
       const day = (l) => new Date(l.updatedAt).toLocaleDateString();
-      updatedNote = '\n' + [data.mlb && `MLB updated ${day(data.mlb)}`, data.fg && `FanGraphs imported ${day(data.fg)}`]
+      updatedNote = [data.mlb && `MLB updated ${day(data.mlb)}`, data.fg && `FanGraphs ${data.fg.label || 'list'} loaded ${day(data.fg)}`]
         .filter(Boolean).join(', ');
       reset();
     });

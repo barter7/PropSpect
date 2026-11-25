@@ -5,7 +5,7 @@
 * { box-sizing: border-box; }
 body { margin: 0; padding: 16px; background: var(--bg); color: var(--fg);
   font: 14px/1.5 system-ui, -apple-system, "Segoe UI", sans-serif; }
-body.popup { width: 340px; }
+body.popup { width: 380px; }
 body.options { max-width: 760px; margin: 0 auto; padding: 24px 16px 48px; }
 h1 { font-size: 18px; margin: 0 0 4px; }
 h2 { font-size: 15px; margin: 24px 0 6px; }
@@ -28,3 +28,5 @@ ul.results li { display: flex; flex-direction: column; padding: 4px 0; border-bo
 ul.results .rk { font-weight: 700; min-width: 44px; }
 label.toggle { display: flex; gap: 8px; align-items: center; }
 details { margin: 8px 0; } summary { cursor: pointer; color: var(--muted); margin-bottom: 6px; }
+ul.results li.has-history { cursor: pointer; }
+ul.results .prk-chart { margin: 8px 0 4px; }

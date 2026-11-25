@@ -1,5 +1,5 @@
 // Turns a CSV export (such as FanGraphs' The Board) or a pasted list into
-// [{ rank, name, team, pos, orgRank, fv, id }]. rank is the overall rank, or null
+// [{ rank, name, team, pos, orgRank, fv, id, signYr }]. rank is the overall rank, or null
 // for a player ranked only within his club.
 (function (root) {
   const TEAMS = new Set(('ARI AZ ATL BAL BOS CHC CHW CWS CIN CLE COL DET HOU KC KCR LAA LAD MIA MIL MIN NYM NYY ' +
@@ -16,6 +16,7 @@
     pos: /^(pos|position)$/,
     fv: /^(fv|future value)$/,
     id: /^(playerid|player id|id)$/,
+    signYr: /^(sign ?yr|sign ?year|signed|signing year)$/,
   };
 
   function splitRow(line, delim) {
@@ -47,6 +48,8 @@
     return Number.isFinite(n) && n > 0 ? n : null;
   };
 
+  const toYear = (v) => { const m = /(19|20)\d{2}/.exec(String(v || '')); return m ? +m[0] : null; };
+
   function parseTable(lines, delim) {
     const header = splitRow(lines[0], delim).map((h) => h.replace(/^﻿/, '').toLowerCase().trim());
     const col = {};
@@ -59,15 +62,17 @@
       if (!name) continue;
       const rank = col.rank >= 0 ? toRank(cells[col.rank]) : players.length + 1;
       const orgRank = col.orgRank >= 0 ? toRank(cells[col.orgRank]) : null;
-      if (rank == null && orgRank == null) continue; // listed but unranked
+      const fv = col.fv >= 0 ? cells[col.fv] || '' : '';
+      if (rank == null && orgRank == null && !fv) continue; // listed but ungraded and unranked
       players.push({
         rank,
         name,
         team: col.team >= 0 ? cells[col.team] || '' : '',
         pos: col.pos >= 0 ? cells[col.pos] || '' : '',
         orgRank,
-        fv: col.fv >= 0 ? cells[col.fv] || '' : '',
+        fv,
         id: col.id >= 0 ? cells[col.id] || '' : '',
+        signYr: col.signYr >= 0 ? toYear(cells[col.signYr]) : null,
       });
     }
     return players;
@@ -93,7 +98,7 @@
       if (!pos && isPos(e)) pos = e;
       else if (!team && /[a-z]/i.test(e) && e.length <= 30) team = e;
     }
-    return { rank: rank != null ? rank : fallbackRank, name, team, pos, orgRank: null, fv: '', id: '' };
+    return { rank: rank != null ? rank : fallbackRank, name, team, pos, orgRank: null, fv: '', id: '', signYr: null };
   }
 
   function parseList(text) {

@@ -15,19 +15,28 @@ drag the files in, and commit.
 
 ## File names
 
-Start every file name with the four-digit year so the lists sort in order and
-the year can be read from the name:
+**FanGraphs (`fangraphs/`)** — up to two files a year, named with the year and
+ending in `r` or `u`:
 
-    <year>-<what>.csv
-
-| Example | Meaning |
+| File | Meaning |
 | --- | --- |
-| `fangraphs/2026-hitters.csv` | The Board, 2026 prospect list, hitters export |
-| `fangraphs/2026-pitchers.csv` | The Board, 2026 prospect list, pitchers export |
-| `fangraphs/2026-11-hitters.csv` | A dated snapshot within a year (year-month) |
-| `mlb-pipeline/2026-top100.csv` | MLB Pipeline Top 100 for 2026 |
-| `mlb-pipeline/2026-mets.csv` | One club's Top 30 |
-| `other/2026-baseball-america-top100.csv` | Another source: name it in the file name |
+| `fangraphs/2025r.csv` | 2025 **Report**: the baseline list for that cycle |
+| `fangraphs/2025u.csv` | 2025 **Updated**: the later revision (new performance, draft and trade movement, graduations) |
+
+The extension reads every such file, puts them in order (a year's Report
+before its Updated), and charts each player's Future Value, club rank and
+Top 100 rank across them. The newest file is also used as the current
+FanGraphs list. Anything before the year and the final letter is ignored, so
+`fg-2025-board-u.csv` works too. A file whose name has no year, or does not
+end in `r` or `u`, is skipped.
+
+Put hitters and pitchers in the same file if you can. Two files with the same
+year and letter (in different folders, or `2025r.csv` and `board-2025r.csv`)
+are merged into one list.
+
+**Other folders** — start the name with the year: `mlb-pipeline/2026-top100.csv`,
+`other/2026-baseball-america-top100.csv`. These are kept for reference and are
+not read by the extension.
 
 ## File format
 
@@ -42,9 +51,16 @@ reads these and ignores the rest:
 | Club | `Org`, `Team` |
 | Position | `Pos`, `Position` |
 | Future Value | `FV` |
+| Year signed | `Sign Yr`, `SignYr`, `Sign Year`, `Signed` |
+| FanGraphs player id | `playerId` |
 
-A player with no overall rank but a club rank is kept. A file with no rank
-column is read in row order.
+A player with no overall rank but a club rank or an FV is kept. A file with
+no rank column is read in row order.
+
+The history chart starts at the year the player signed, so export a view of
+The Board that includes the signing year. Without that column the chart
+starts at the first list he appears on. The player id is used to follow a
+player from file to file; when it is missing or changes, his name is used.
 
 ## Before you upload
 

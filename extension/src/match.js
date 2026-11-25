@@ -146,7 +146,7 @@
     return found;
   }
 
-  const api = { tokenize, nameTokens, combine, sortKey, tier, badgeText, describe, buildIndex, findPlayers };
+  const api = { tokenize, nameTokens, normTeam, combine, sortKey, tier, badgeText, describe, buildIndex, findPlayers };
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
   else root.ProspectMatch = api;
 })(typeof globalThis !== 'undefined' ? globalThis : this);
