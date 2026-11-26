@@ -59,7 +59,8 @@ const HISTORY = {
   });
   try {
     await ctx.route(/ebay\.com/, (route) => route.fulfill({
-      contentType: 'text/html', body: fs.readFileSync(FIXTURE, 'utf8'),
+      contentType: 'text/html',
+      body: fs.readFileSync(/LH_Sold=1/.test(route.request().url()) ? path.join(__dirname, 'fixture-sold.html') : FIXTURE, 'utf8'),
     }));
     await ctx.route(/www\.mlb\.com/, (route) => {
       const slug = new URL(route.request().url()).pathname.split('/').filter(Boolean).pop();
@@ -175,6 +176,52 @@ const HISTORY = {
     if (process.argv[2]) await page.screenshot({ path: process.argv[2] });
     await page.mouse.move(780, 540);
     await page.waitForFunction(() => !document.querySelector('.prk-card'));
+
+    // Sold prices: browsing eBay's Sold results saves each sold listing of a ranked player.
+    const sold = await ctx.newPage();
+    await sold.goto('https://www.ebay.com/sch/i.html?_nkw=bowman+auto&LH_Sold=1&LH_Complete=1');
+    await mgr.goto(`chrome-extension://${id}/options.html`);
+    await mgr.waitForFunction(() => /^4 sold listings saved for 3 players/.test(document.getElementById('sales-current').textContent));
+    const saved = await mgr.evaluate(() => new Promise((ok) => chrome.storage.local.get('sales', (d) => ok(d.sales))));
+    const brief = Object.values(saved).map((r) => [r.player, r.team, r.sold_date, r.price, r.format, r.bids, r.shipping, r.item_id, r.fg_fv, r.mlb_rank])
+      .sort((a, b) => (a[7] + a[0]).localeCompare(b[7] + b[0]));
+    assert.deepStrictEqual(brief, [
+      ['Dario Vance', 'PIT', '2026-11-20', 1234.56, 'Auction', 12, 4.99, '356000000001', '60', 1],
+      ['Dario Vance', 'PIT', '2026-11-03', 310, 'Buy It Now', null, 0, '356000000002', '60', 1],
+      ['Kai Sato-Reyes', 'LAD', '2026-11-03', 310, 'Buy It Now', null, 0, '356000000002', '50', 77],
+      ['J.J. Okafor', 'STL', '2026-10-30', 45, 'Best Offer', null, 1.25, '356000000003', '45+', null],
+    ]);
+    // The hover card on eBay shows what has been saved for that player.
+    await sold.bringToFront();
+    await sold.locator('.prk-badge').first().hover();
+    assert.match(await sold.locator('.prk-card .prk-card-sales').innerText(), /^Sold prices saved: 2 · median \$772\.28 · last \$1,234\.56 on 2026-11-20$/);
+    await sold.mouse.move(780, 540);
+    // Download the CSV.
+    await mgr.bringToFront();
+    const [dl] = await Promise.all([mgr.waitForEvent('download'), mgr.click('#sales-download')]);
+    const csv = fs.readFileSync(await dl.path(), 'utf8').split('\n');
+    assert.strictEqual(csv[0], 'sold_date,player,team,pos,price,currency,shipping,format,note,bids,mlb_rank,mlb_org_rank,fg_fv,fg_rank,fg_org_rank,title,url,item_id,saved_at');
+    assert.match(csv[1], /^2026-11-20,Dario Vance,PIT,SS,1234.56,\$,4.99,Auction,,12,1,1,60,2,1,2025 Bowman Chrome 1st Dario Vance Auto \/99 PSA 10,https:\/\/www.ebay.com\/itm\/356000000001,356000000001,/);
+    assert.ok(csv.some((l) => /J\.J\. Okafor.*Best Offer,asking price; accepted offer not shown/.test(l)));
+    assert.strictEqual(csv.filter(Boolean).length, 5);
+    // Saving can be switched off in the popup; nothing new is saved then.
+    await mgr.goto(`chrome-extension://${id}/popup.html`);
+    assert.strictEqual(await mgr.locator('#sales-count').innerText(), '(4 saved)');
+    await mgr.uncheck('#saveSales');
+    await sold.evaluate(() => {
+      const li = document.createElement('li'); li.className = 's-item';
+      li.innerHTML = '<div class="s-item__caption"><span>Sold  Nov 21, 2026</span></div><a href="https://www.ebay.com/itm/356000000009"><div class="s-item__title"><span>Dario Vance 2025 Bowman Sapphire</span></div></a><span class="s-item__price">$80.00</span>';
+      document.querySelector('ul').appendChild(li);
+    });
+    await sold.waitForTimeout(1800);
+    const after = await mgr.evaluate(() => new Promise((ok) => chrome.storage.local.get('sales', (d) => ok(Object.keys(d.sales).length))));
+    assert.strictEqual(after, 4, 'nothing saved while switched off');
+    if (process.argv[3]) {
+      await mgr.goto(`chrome-extension://${id}/options.html`);
+      await mgr.setViewportSize({ width: 820, height: 1400 });
+      await mgr.locator('h2', { hasText: 'Sold prices' }).scrollIntoViewIfNeeded();
+      await mgr.screenshot({ path: process.argv[3], fullPage: false });
+    }
     console.log('e2e passed:', badges.join(' | '));
   } finally {
     await ctx.close();

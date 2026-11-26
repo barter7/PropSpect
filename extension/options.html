@@ -52,6 +52,26 @@
     <span class="muted" id="hist-status"></span>
   </div>
 
+  <h2>Sold prices</h2>
+  <p class="muted" id="sales-current"></p>
+  <p>While you browse eBay with the <strong>Sold items</strong> filter on (or open a sold listing), every sold
+     listing that names a ranked player is saved here with its price, date and the player's ranks at the time.
+     Turn this off in the popup. On a <em>Best Offer</em> sale eBay shows only the asking price, so those are
+     marked and left out of medians.</p>
+  <div class="row">
+    <button class="primary" id="sales-download" disabled>Download CSV</button>
+    <button id="sales-clear" disabled>Remove all</button>
+    <span class="muted" id="sales-status"></span>
+  </div>
+  <p class="muted">To show them on the Prospect Board dashboard, open its Sources panel and replace the
+     <em>Sold prices</em> file with the downloaded CSV.</p>
+  <div class="scroll" id="sales-wrap" hidden>
+    <table>
+      <thead><tr><th>Sold</th><th>Player</th><th>Price</th><th>Format</th><th>FV</th><th>Listing</th></tr></thead>
+      <tbody id="sales-rows"></tbody>
+    </table>
+  </div>
+
   <h2 id="preview-title">Combined rankings</h2>
   <div class="scroll">
     <table>
@@ -62,6 +82,7 @@
 
   <script src="src/match.js"></script>
   <script src="src/parse.js"></script>
+  <script src="src/sales.js"></script>
   <script src="options.js"></script>
 </body>
 </html>

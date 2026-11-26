@@ -13,3 +13,8 @@ The page's player box is a pick-or-type dropdown of every player the other
 filters keep. The **List** chooser above the table shows each player as one
 list had him (FV, ranks, age, level, ETA, risk and team from that list); the
 "Who" filter does not apply while a list is chosen.
+
+Sold prices come from a second file, *Sold prices*, which starts empty. Replace
+it in the dashboard's Sources panel with the CSV downloaded from the extension
+(rankings page, Sold prices, Download CSV). The table then gains Sold and
+Median sold columns, and the player history card lists his saved sales.

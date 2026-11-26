@@ -30,3 +30,4 @@ label.toggle { display: flex; gap: 8px; align-items: center; }
 details { margin: 8px 0; } summary { cursor: pointer; color: var(--muted); margin-bottom: 6px; }
 ul.results li.has-history { cursor: pointer; }
 ul.results .prk-chart { margin: 8px 0 4px; }
+#sales-rows td:first-child { white-space: nowrap; }

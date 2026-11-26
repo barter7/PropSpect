@@ -73,6 +73,30 @@ named `<year>r.csv` (Report) and `<year>u.csv` (Updated); see
 
 Either way the newest list also becomes the FanGraphs part of the badge.
 
+## Sold prices
+
+While you browse eBay with the **Sold items** filter on, or open a listing that
+has sold, the extension saves every sold listing that names a ranked player:
+sale date, price, shipping, format (auction, Buy It Now, Best Offer), bids,
+title and link, plus the player's MLB and FanGraphs ranks at that moment. A
+listing seen again is updated, not duplicated; a dual-player card is saved once
+for each ranked player on it.
+
+- Saving is on by default; switch it off with **Save sold prices** in the popup.
+- Hover a badge to see how many sales are saved for that player, the median
+  and the latest price.
+- The rankings page lists recent saved sales, with **Download CSV** and
+  **Remove all**.
+- On a Best Offer sale eBay shows only the asking price, so those rows are
+  marked and left out of medians.
+- Everything stays in the browser until you download it. To show it on the
+  Prospect Board dashboard, replace its *Sold prices* file in Sources with the
+  CSV.
+
+The page reading (`src/sales.js`) is written against eBay's sold-results
+layout as of late 2026 and tested on a stand-in page; if eBay changes its
+markup, sales may stop saving until it is updated.
+
 ## Matching
 
 A badge appears only when a player's full name is in the title. Case,

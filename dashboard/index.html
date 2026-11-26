@@ -44,6 +44,14 @@
   th[aria-sort="descending"] .pb-sort::after { content: "▼"; font-size: 0.7em; color: var(--color-fg); }
   .pb-listbar { align-items: end; margin-bottom: 4px; }
   .pb-listnote { margin: 0; flex: 1 1 300px; align-self: center; }
+  .pb-sales { margin-top: 14px; border-top: 1px solid var(--color-border-line); padding-top: 10px; min-width: 0; }
+  .pb-sales-head { font-size: var(--cds-font-size-body); font-weight: var(--cds-font-weight-medium); }
+  .pb-sales-sum { font-size: var(--cds-font-size-caption); color: var(--color-fg-muted); margin: 2px 0 6px; }
+  .pb-sales table { border-collapse: collapse; width: 100%; font-size: var(--cds-font-size-caption); font-variant-numeric: tabular-nums; table-layout: fixed; }
+  .pb-sales td { padding: 4px 6px 4px 0; border-bottom: 1px solid var(--color-border-line); vertical-align: top; }
+  .pb-sales td.pb-num { text-align: right; padding-right: 12px; }
+  .pb-sales td.pb-t { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .pb-sales a { color: var(--color-fg); }
   .pb-foot { display: flex; flex-wrap: wrap; gap: var(--cds-gap-sm); align-items: center; font-size: var(--cds-font-size-caption); color: var(--color-fg-muted); margin-top: 8px; }
   .pb-detail-name { font-size: var(--cds-font-size-heading); font-weight: var(--cds-font-weight-medium); }
   .pb-detail-bio { color: var(--color-fg-muted); font-size: var(--cds-font-size-caption); margin: 2px 0 10px; line-height: 1.5; }
@@ -115,6 +123,8 @@
         <option value="fv_change:asc">FV change, biggest fallers</option>
         <option value="bonus:desc">Bonus, largest first</option>
         <option value="eta:asc">ETA, soonest first</option>
+        <option value="sale_median:desc">Median sold price, highest first</option>
+        <option value="sales_n:desc">Most sold listings saved</option>
         <option value="name:asc">Name</option>
       </select></label>
     <button class="pb-reset" id="pb-reset" type="button">Reset</button>
@@ -140,7 +150,7 @@
     <section class="pb-card" id="pb-detail-card">
       <h2 class="pb-h2">Player history</h2>
       <p class="pb-note">Pick a row in the table to chart that player's Future Value, club rank and Top 100 rank on every list he has been on, starting from the year he signed.</p>
-      <div class="pb-hist" data-draw="detail" data-source="players"></div>
+      <div class="pb-hist" data-draw="detail" data-source="players sales"></div>
     </section>
   </div>
 
@@ -170,6 +180,8 @@
           <th data-field="bonus" data-sort="bonus" class="pb-num"><button class="pb-sort" type="button">Bonus ($)</button></th>
           <th data-field="fv_first" data-sort="fv_first" class="pb-num"><button class="pb-sort" type="button">First FV</button></th>
           <th data-field="fv_change" data-sort="fv_change" class="pb-num"><button class="pb-sort" type="button">FV change</button></th>
+          <th data-field="sales" data-source="player_sales" data-sort="sales_n" class="pb-num"><button class="pb-sort" type="button">Sold</button></th>
+          <th data-field="median_price" data-source="player_sales" data-sort="sale_median" class="pb-num"><button class="pb-sort" type="button">Median sold ($)</button></th>
           <th data-field="last_list" data-sort="last_list"><button class="pb-sort" type="button">List</button></th>
         </tr></thead>
         <tbody data-draw="rows"></tbody>
@@ -186,12 +198,13 @@
   <details id="pb-notes">
     <summary>How to read the lists</summary>
     <p>List names are a year plus a letter. <b>r</b> is that year's Report, the baseline list for the cycle. <b>u</b> is the Updated list, revised later for new performance, draft and trade movement, and graduations. FanGraphs revises one club at a time, so "on a current list" means the player is on the newest list his club appears in.</p>
+    <p><b>Sold</b> and <b>Median sold</b> come from the sold eBay listings the Prospect Rank extension saved while you browsed eBay's Sold results. The median mixes every kind of card (base, refractors, autographs), and leaves out Best Offer sales, where eBay shows only the asking price. To update them, download the CSV from the extension's settings and replace the <i>Sold prices</i> file in Sources.</p>
     <p>A Top 100 rank can run past 100 because FanGraphs ranks every player graded 50 FV or better. Players are followed from list to list by their FanGraphs player id, and by name and signing year when the id is missing or changed.</p>
   </details>
 </div>
 
 <script>
-  const NUM = ['fv_value', 'top100', 'org_rank', 'age', 'eta', 'sign_year', 'bonus', 'fv_change', 'lists'];
+  const NUM = ['fv_value', 'top100', 'org_rank', 'age', 'eta', 'sign_year', 'bonus', 'fv_change', 'lists', 'sales_n', 'sale_median'];
   const POS = {
     pit: /P$|^TWP$/i, c: /^C(\/|$)/i, inf: /^(1B|2B|3B|SS|INF|UTIL|4C)/i, of: /^(LF|CF|RF|OF)/i,
   };
@@ -245,11 +258,46 @@
     if (p.q && !r._name.includes(fold(p.q))) return false;
     return true;
   }
+  // Sold eBay listings saved by the extension, matched to players by name, then club.
+  const nameKey = (s) => {
+    const t = fold(s).replace(/[.'’`]/g, '').replace(/[^a-z0-9]+/g, ' ').trim().split(' ').filter(Boolean);
+    const out = [];
+    for (const w of t) { if (w.length === 1 && out.length && out[out.length - 1].single) out[out.length - 1].w += w; else out.push({ w, single: w.length === 1 }); }
+    const words = out.map((o) => o.w);
+    while (words.length > 2 && ['jr', 'sr', 'ii', 'iii', 'iv'].includes(words[words.length - 1])) words.pop();
+    return words.join(' ');
+  };
+  function salesFor(playerRows, sales) {
+    const byName = new Map();
+    for (const r of playerRows) {
+      const k = nameKey(r.name);
+      if (!byName.has(k)) byName.set(k, []);
+      byName.get(k).push(r);
+    }
+    const out = new Map(); // player key -> sale rows
+    for (const s of sales) {
+      const cands = byName.get(nameKey(s.player)) || [];
+      const p = cands.find((c) => c.org === s.team) || (cands.length === 1 ? cands[0] : null);
+      if (!p) continue;
+      if (!out.has(p.key)) out.set(p.key, []);
+      out.get(p.key).push(s);
+    }
+    return out;
+  }
+  const priced = (rows) => rows.filter((s) => s.format !== 'Best Offer' && num(s.price) != null);
+  function salesByKey() {
+    const s = dash.data('player_sales');
+    return new Map(s.status === 'ok' && Array.isArray(s.data) ? s.data.map((r) => [r.key, r]) : []);
+  }
+
   function filtered(raw, over) {
     const p = Object.assign(P(), over || {});
     let base = players(raw);
     if (p.list) base = base.map((r) => onList(r, p.list)).filter(Boolean);
     const rows = base.filter((r) => matches(r, p));
+    if (p.nosort) return rows;
+    const sm = salesByKey();
+    for (const r of rows) { const s = sm.get(r.key); r.sales_n = s ? s.sales : null; r.sale_median = s ? s.median_price : null; }
     const dir = p.dir === 'asc' ? 1 : -1;
     const text = !NUM.includes(p.sort);
     return rows.sort((a, b) => {
@@ -277,7 +325,7 @@
     description: 'Counts and median age of the players the current filters keep.',
     inputs: ['players'],
     fn: (players) => {
-      const rows = filtered(players);
+      const rows = filtered(players, { nosort: true });
       const ages = rows.map((r) => r.age).filter((a) => a != null).sort((a, b) => a - b);
       const mid = ages.length ? (ages[Math.floor((ages.length - 1) / 2)] + ages[Math.ceil((ages.length - 1) / 2)]) / 2 : null;
       return [{
@@ -288,13 +336,30 @@
       }];
     },
   });
+  dash.calc('player_sales', {
+    title: 'Sold prices per player',
+    description: 'For each player with saved sold listings: how many, the median and latest price (Best Offer sales are counted but not priced, since eBay hides the accepted offer), and the latest sale date.',
+    inputs: ['players', 'sales'],
+    fn: (players, sales) => {
+      const rows = [];
+      for (const [key, list] of salesFor(players, sales)) {
+        const p = priced(list).map((s) => ({ price: +s.price, date: s.sold_date || '' }));
+        const prices = p.map((x) => x.price).sort((a, b) => a - b);
+        const median = prices.length ? (prices[Math.floor((prices.length - 1) / 2)] + prices[Math.ceil((prices.length - 1) / 2)]) / 2 : null;
+        const last = p.sort((a, b) => b.date.localeCompare(a.date))[0];
+        rows.push({ key, sales: list.length, median_price: median == null ? null : Math.round(median * 100) / 100,
+          last_price: last ? last.price : null, last_sold: last ? last.date : '' });
+      }
+      return rows;
+    },
+  });
   dash.calc('tiers', {
     title: 'Players by Future Value grade',
     description: 'How many of the players the filters keep sit at each Future Value grade.',
     inputs: ['players'],
     fn: (players) => {
       const count = new Map();
-      for (const r of filtered(players)) if (r.fv) count.set(r.fv, (count.get(r.fv) || 0) + 1);
+      for (const r of filtered(players, { nosort: true })) if (r.fv) count.set(r.fv, (count.get(r.fv) || 0) + 1);
       const value = (fv) => parseInt(fv, 10) + (fv.includes('+') ? 2.5 : 0);
       return [...count].map(([fv, n]) => ({ fv, players: n })).sort((a, b) => value(a.fv) - value(b.fv));
     },
@@ -337,7 +402,7 @@
   dash.draw('name-options', (dl) => {
     const s = dash.data('players');
     if (s.status !== 'ok') { dl.replaceChildren(); return; }
-    const rows = filtered(s.data, { q: '' }).sort((a, b) => a.name.localeCompare(b.name));
+    const rows = filtered(s.data, { q: '', nosort: true }).sort((a, b) => a.name.localeCompare(b.name));
     dl.replaceChildren(...rows.map((r) => {
       const o = document.createElement('option');
       o.value = r.name;
@@ -400,7 +465,7 @@
       th.setAttribute('aria-sort', th.dataset.sort === p.sort ? (p.dir === 'asc' ? 'ascending' : 'descending') : 'none');
     });
     const s = dash.data('players');
-    const n = s.status === 'ok' ? filtered(s.data).length : 0;
+    const n = s.status === 'ok' ? filtered(s.data, { nosort: true }).length : 0;
     document.querySelectorAll('#pb-empty').forEach((el) => { el.hidden = !(s.status === 'ok' && n === 0); });
     document.querySelectorAll('#pb-error').forEach((el) => { el.hidden = s.status !== 'error'; });
     document.querySelectorAll('#pb-more').forEach((el) => { el.hidden = n <= (+p.show || 100); });
@@ -412,7 +477,8 @@
     ['name', 'pb-name'], ['org'], ['pos'], ['age', 'pb-num', (v) => v.toFixed(1)], ['fv', 'pb-num'], ['top100', 'pb-num'],
     ['org_rank', 'pb-num'], ['level'], ['eta', 'pb-num'], ['risk'], ['sign_year', 'pb-num'], ['sign_type'],
     ['bonus', 'pb-num', (v) => money(v)], ['fv_first', 'pb-num'],
-    ['fv_change', 'pb-num', (v) => (v > 0 ? '+' : '') + v], ['last_list'],
+    ['fv_change', 'pb-num', (v) => (v > 0 ? '+' : '') + v],
+    ['sales_n', 'pb-num'], ['sale_median', 'pb-num', (v) => money(v)], ['last_list'],
   ];
   dash.draw('rows', (tbody) => {
     const s = dash.data('players');
@@ -479,6 +545,52 @@
   });
 
   // The selected player's history: three rows on one time axis that starts at his signing year.
+  // The selected player's saved sold listings, newest first.
+  function salesBlock(r, all) {
+    const wrap = Object.assign(document.createElement('div'), { className: 'pb-sales' });
+    const head = Object.assign(document.createElement('div'), { className: 'pb-sales-head', textContent: 'Sold on eBay' });
+    const sum = Object.assign(document.createElement('div'), { className: 'pb-sales-sum' });
+    wrap.append(head, sum);
+    const src = dash.data('sales');
+    if (src.status === 'loading') { sum.textContent = 'Loading sold prices…'; return wrap; }
+    if (src.status !== 'ok') { sum.textContent = 'The sold prices file did not load.'; return wrap; }
+    const list = (salesFor(all, src.data).get(r.key) || []).slice().sort((a, b) => String(b.sold_date).localeCompare(String(a.sold_date)));
+    if (!list.length) {
+      sum.textContent = src.data.length
+        ? 'No sold listings saved for him yet.'
+        : 'No sold prices saved yet. Browse eBay with the Sold items filter and the Prospect Rank extension on, then replace the Sold prices file in Sources with its CSV.';
+      return wrap;
+    }
+    const pr = priced(list).map((s) => +s.price).sort((a, b) => a - b);
+    const med = pr.length ? (pr[Math.floor((pr.length - 1) / 2)] + pr[Math.ceil((pr.length - 1) / 2)]) / 2 : null;
+    const usd = (v) => '$' + d3.format(',.2f')(v);
+    sum.textContent = `${list.length} saved` + (pr.length ? ` · median ${usd(med)} · range ${usd(pr[0])} to ${usd(pr[pr.length - 1])}` : '') +
+      (pr.length < list.length ? ` · ${list.length - pr.length} Best Offer sale${list.length - pr.length > 1 ? 's' : ''} not priced` : '');
+    const table = document.createElement('table');
+    const col = (w) => Object.assign(document.createElement('col'), { style: `width:${w}` });
+    const cg = document.createElement('colgroup');
+    cg.append(col('84px'), col('86px'), col('auto'));
+    table.appendChild(cg);
+    for (const s of list.slice(0, 8)) {
+      const tr = document.createElement('tr');
+      const d = Object.assign(document.createElement('td'), { textContent: s.sold_date || '' });
+      const p = Object.assign(document.createElement('td'), { className: 'pb-num',
+        textContent: num(s.price) == null ? '' : (s.format === 'Best Offer' ? 'ask ' : '') + usd(+s.price) });
+      const t = Object.assign(document.createElement('td'), { className: 'pb-t' });
+      const url = String(s.url || '');
+      if (/^https:\/\/(www\.)?ebay\.[a-z.]+\//.test(url)) {
+        const a = Object.assign(document.createElement('a'), { href: url, target: '_blank', rel: 'noopener', textContent: s.title || url });
+        t.appendChild(a);
+      } else t.textContent = s.title || '';
+      t.title = s.title || '';
+      tr.append(d, p, t);
+      table.appendChild(tr);
+    }
+    wrap.appendChild(table);
+    if (list.length > 8) wrap.appendChild(Object.assign(document.createElement('div'), { className: 'pb-sales-sum', textContent: `Showing the 8 most recent of ${list.length}.` }));
+    return wrap;
+  }
+
   dash.draw('detail', (box) => {
     const s = dash.data('players');
     const say = (text) => box.replaceChildren(Object.assign(document.createElement('p'), { className: 'pb-msg', textContent: text }));
@@ -573,6 +685,6 @@
       r.bonus != null && `Bonus $${money(r.bonus)}`,
       r.status === 'Current' ? 'On a current list' : `Last listed ${listLabel(r.last_list)}`,
     ].filter(Boolean).join(' · ');
-    box.replaceChildren(name, bio, svg.node(), readout);
+    box.replaceChildren(name, bio, svg.node(), readout, salesBlock(r, players(s.data)));
   });
 </script>

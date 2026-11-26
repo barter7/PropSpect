@@ -158,3 +158,44 @@ test('builds a timeline per player across files', () => {
   assert.strictEqual(History.lookup(index, { name: 'DARIO VANCE', team: 'TB' }).signYr, 2022);
   assert.strictEqual(History.lookup(index, { name: 'Nobody', team: 'TB' }), null);
 });
+
+const Sales = require('../src/sales.js');
+test('reads a sold search-result card', () => {
+  const today = new Date(2026, 10, 26);
+  const card = (t) => Sales.parseCard(t, today);
+  assert.deepStrictEqual(card('2024 Bowman Chrome Auto Sold Nov 20, 2026 $1,234.56 12 bids +$4.99 delivery'),
+    { soldDate: '2026-11-20', price: 1234.56, currency: '$', shipping: 4.99, bids: 12, format: 'Auction' });
+  assert.deepStrictEqual(card('Sold  Nov 3, 2026 Card $38.00 Buy It Now Free delivery'),
+    { soldDate: '2026-11-03', price: 38, currency: '$', shipping: 0, bids: null, format: 'Buy It Now' });
+  assert.strictEqual(card('Sold Oct 30, 2026 Card $45.00 Best offer accepted').format, 'Best Offer');
+  assert.deepStrictEqual(card('Sold 20 Nov 2026 Card £12.50 3 bids +£2.70 postage'),
+    { soldDate: '2026-11-20', price: 12.5, currency: '£', shipping: 2.7, bids: 3, format: 'Auction' });
+  assert.strictEqual(card('Ended Nov 2, 2026 Card $5.00 0 bids'), null, 'ended without a sale');
+  assert.strictEqual(card('Sold Nov 2, 2026 Lot $5.00 to $20.00'), null, 'a price range is not one sale');
+  assert.strictEqual(card('2024 Bowman $10.00 Buy It Now'), null, 'still for sale');
+});
+test('reads a sold item page, dates without a year, and item ids', () => {
+  const today = new Date(2026, 10, 26);
+  assert.deepStrictEqual(Sales.parseItemPage('This listing sold on Wed, Nov 19 at 8:12 PM. 7 bids', 'US $45.00', today),
+    { soldDate: '2026-11-19', price: 45, currency: '$', shipping: null, bids: 7, format: 'Auction' });
+  assert.strictEqual(Sales.parseItemPage('Buy It Now US $45.00', 'US $45.00', today), null);
+  assert.strictEqual(Sales.parseDate('Fri, Dec 19', today), '2025-12-19', 'a later month means last year');
+  assert.strictEqual(Sales.itemId('https://www.ebay.com/itm/2025-bowman/356000000001?hash=x'), '356000000001');
+  assert.strictEqual(Sales.itemId('https://www.ebay.com/sch/i.html'), '');
+});
+test('summarizes and exports sales, leaving Best Offer asking prices out of the median', () => {
+  const p = { name: 'Dario Vance', team: 'PIT', pos: 'SS', mlb: { rank: 1, orgRank: 1 }, fg: { fv: '60', rank: 2, orgRank: 1 } };
+  const at = { id: '1', url: 'u', title: 'Dario Vance, "Auto"', page: 'search' };
+  const recs = [
+    Sales.record({ soldDate: '2026-11-20', price: 100, currency: '$', format: 'Auction', bids: 3, shipping: 0 }, at, p, 0),
+    Sales.record({ soldDate: '2026-11-21', price: 40, currency: '$', format: 'Buy It Now' }, { ...at, id: '2' }, p, 0),
+    Sales.record({ soldDate: '2026-11-22', price: 900, currency: '$', format: 'Best Offer' }, { ...at, id: '3' }, p, 0),
+  ];
+  const s = Sales.summarize(recs);
+  assert.deepStrictEqual([s.count, s.priced, s.median, s.low, s.high, s.last.item_id], [3, 2, 70, 40, 100, '2']);
+  const csv = Sales.toCsv(recs).trim().split('\n');
+  assert.strictEqual(csv.length, 4);
+  assert.strictEqual(csv[1].split(',').slice(0, 9).join(','), '2026-11-22,Dario Vance,PIT,SS,900,$,,Best Offer,asking price; accepted offer not shown');
+  assert.ok(csv[3].includes('"Dario Vance, ""Auto"""'));
+  assert.strictEqual(Sales.summarize([]), null);
+});

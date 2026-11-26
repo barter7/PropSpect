@@ -120,4 +120,66 @@ $('hist-clear').addEventListener('click', () => chrome.storage.local.remove('his
   render();
 }));
 
+// Sold prices saved from eBay.
+function renderSales() {
+  chrome.storage.local.get('sales', ({ sales }) => {
+    const all = Object.values(sales || {});
+    const players = new Set(all.map((r) => r.player)).size;
+    $('sales-current').textContent = all.length
+      ? `${all.length} sold listings saved for ${players} players.`
+      : 'No sold listings saved yet.';
+    $('sales-download').disabled = $('sales-clear').disabled = !all.length;
+    $('sales-wrap').hidden = !all.length;
+    const body = $('sales-rows');
+    body.textContent = '';
+    const recent = all.sort((a, b) => (b.sold_date || '').localeCompare(a.sold_date || '')).slice(0, 200);
+    for (const r of recent) {
+      const tr = document.createElement('tr');
+      const price = `${r.currency || '$'}${r.price.toFixed(2)}`;
+      for (const v of [r.sold_date, `${r.player} (${r.team})`, price, r.format + (r.note ? ' *' : ''), r.fg_fv]) {
+        const td = document.createElement('td');
+        td.textContent = v == null ? '' : v;
+        tr.appendChild(td);
+      }
+      const td = document.createElement('td');
+      const a = document.createElement('a');
+      a.href = r.url;
+      a.target = '_blank';
+      a.rel = 'noopener';
+      a.textContent = r.title.length > 60 ? r.title.slice(0, 57) + '...' : r.title;
+      td.appendChild(a);
+      tr.appendChild(td);
+      body.appendChild(tr);
+    }
+  });
+}
+$('sales-download').addEventListener('click', () => {
+  chrome.storage.local.get('sales', ({ sales }) => {
+    const blob = new Blob([ProspectSales.toCsv(Object.values(sales || {}))], { type: 'text/csv' });
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = `prospect-sold-prices-${new Date().toISOString().slice(0, 10)}.csv`;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    setTimeout(() => URL.revokeObjectURL(a.href), 5000);
+    $('sales-status').textContent = 'Downloaded.';
+  });
+});
+let clearArmed = false;
+$('sales-clear').addEventListener('click', () => {
+  // A second press confirms, since this cannot be undone.
+  if (!clearArmed) {
+    clearArmed = true;
+    $('sales-clear').textContent = 'Press again to remove all';
+    setTimeout(() => { clearArmed = false; $('sales-clear').textContent = 'Remove all'; }, 4000);
+    return;
+  }
+  clearArmed = false;
+  $('sales-clear').textContent = 'Remove all';
+  chrome.storage.local.remove('sales', () => { $('sales-status').textContent = 'All saved sales removed.'; });
+});
+chrome.storage.onChanged.addListener((changes) => { if (changes.sales) renderSales(); });
+renderSales();
+
 render();

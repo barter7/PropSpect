@@ -37,7 +37,10 @@ function search() {
   }
 }
 
-chrome.storage.local.get(['mlb', 'fg', 'history', 'enabled'], ({ mlb, fg, history: h, enabled }) => {
+chrome.storage.local.get(['mlb', 'fg', 'history', 'enabled', 'saveSales', 'sales'], ({ mlb, fg, history: h, enabled, saveSales, sales }) => {
+  $('saveSales').checked = saveSales !== false;
+  const n = Object.keys(sales || {}).length;
+  $('sales-count').textContent = n ? `(${n} saved)` : '';
   history = h || null;
   historyIndex = ProspectHistory.indexHistory(history);
   players = ProspectMatch.combine(mlb, fg);
@@ -51,5 +54,6 @@ chrome.storage.local.get(['mlb', 'fg', 'history', 'enabled'], ({ mlb, fg, histor
 
 $('q').addEventListener('input', search);
 $('enabled').addEventListener('change', (e) => chrome.storage.local.set({ enabled: e.target.checked }));
+$('saveSales').addEventListener('change', (e) => chrome.storage.local.set({ saveSales: e.target.checked }));
 $('open').textContent = 'Sync or import rankings';
 $('open').addEventListener('click', () => chrome.runtime.openOptionsPage());
