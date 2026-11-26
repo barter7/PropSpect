@@ -136,7 +136,7 @@ function renderSales() {
     for (const r of recent) {
       const tr = document.createElement('tr');
       const price = `${r.currency || '$'}${r.price.toFixed(2)}`;
-      for (const v of [r.sold_date, `${r.player} (${r.team})`, price, r.format + (r.note ? ' *' : ''), r.fg_fv]) {
+      for (const v of [r.sold_date, `${r.player} (${r.team})`, price, ProspectCards.describeCard(ProspectCards.parseTitle(r.title, r.player)), r.format + (r.note ? ' *' : ''), r.fg_fv]) {
         const td = document.createElement('td');
         td.textContent = v == null ? '' : v;
         tr.appendChild(td);

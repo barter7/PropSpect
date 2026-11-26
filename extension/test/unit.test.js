@@ -193,9 +193,41 @@ test('summarizes and exports sales, leaving Best Offer asking prices out of the 
   ];
   const s = Sales.summarize(recs);
   assert.deepStrictEqual([s.count, s.priced, s.median, s.low, s.high, s.last.item_id], [3, 2, 70, 40, 100, '2']);
-  const csv = Sales.toCsv(recs).trim().split('\n');
+  const csv = Sales.toCsv(recs.map((r) => ({ ...r, player: r.player }))).trim().split('\n');
   assert.strictEqual(csv.length, 4);
   assert.strictEqual(csv[1].split(',').slice(0, 9).join(','), '2026-11-22,Dario Vance,PIT,SS,900,$,,Best Offer,asking price; accepted offer not shown');
   assert.ok(csv[3].includes('"Dario Vance, ""Auto"""'));
   assert.strictEqual(Sales.summarize([]), null);
+});
+
+const Cards = require('../src/cards.js');
+test('reads card type, variant and numbering from a listing title', () => {
+  const read = (title, player) => {
+    const c = Cards.parseTitle(title, player);
+    return [c.year, c.product, c.first_bowman, c.auto, c.variant, c.numbered_to, c.serial, c.grader, c.grade, c.noise];
+  };
+  assert.deepStrictEqual(read('2024 Bowman Chrome 1st Jesus Made Gold Refractor Auto /50 PSA 10', 'Jesús Made'),
+    ['2024', 'Bowman Chrome', true, true, 'Gold', 50, null, 'PSA', '10', '']);
+  assert.deepStrictEqual(read('2025 Bowman Chrome Prospects Eli Willits 1st Bowman Auto Blue Wave #/150 Nationals', 'Eli Willits'),
+    ['2025', 'Bowman Chrome', true, true, 'Blue Wave', 150, null, '', '', '']);
+  assert.deepStrictEqual(read('2023 Bowman Draft Chrome 1st Auto Walker Jenkins Superfractor 1/1 Twins', 'Walker Jenkins'),
+    ['2023', 'Bowman Draft Chrome', true, true, 'Superfractor', 1, 1, '', '', '']);
+  assert.deepStrictEqual(read('2024 Bowman Chrome Franklin Arias 1st Bowman Refractor Auto 211/499 Red Sox', 'Franklin Arias'),
+    ['2024', 'Bowman Chrome', true, true, 'Refractor', 499, 211, '', '', ''], 'Red Sox is a team, not a Red parallel');
+  assert.deepStrictEqual(read('Ethan Green 2025 Bowman Draft Chrome 1st Auto Gold Shimmer 23/50 BGS 9.5', 'Ethan Green'),
+    ['2025', 'Bowman Draft Chrome', true, true, 'Gold Shimmer', 50, 23, 'BGS', '9.5', ''], 'a surname is not a colour');
+  assert.deepStrictEqual(read('2024 Bowman Chrome 1st Jefferson Rojas Non-Auto Green Refractor /99 SGC 10 Mets', 'Jefferson Rojas'),
+    ['2024', 'Bowman Chrome', true, false, 'Green', 99, null, 'SGC', '10', '']);
+  assert.deepStrictEqual(read('2025 Bowman Paper 1st Bowman Kade Anderson BP-12 Mariners RC Base', 'Kade Anderson'),
+    ['2025', 'Bowman', true, false, 'Base', null, null, '', '', '']);
+  assert.strictEqual(Cards.parseTitle('2024 Bowman Chrome Sapphire 1st Edition Leo De Vries Orange /25', 'Leo De Vries').first_bowman, false,
+    '1st Edition is its own product');
+  assert.strictEqual(Cards.parseTitle('2025 Bowman Draft 1st Round Pick JJ Wetherholt CPA Purple /250', 'JJ Wetherholt').first_bowman, false);
+  assert.strictEqual(Cards.parseTitle('2021 Bowman Chrome 1st Auto Signed 11/20/25 shipped', 'X Y').numbered_to, null, 'a date is not a serial');
+  assert.strictEqual(Cards.parseTitle('2024 Bowman Chrome 1st Auto Franklin Arias 12/25 Orange', 'Franklin Arias').serial, 12);
+  assert.strictEqual(Cards.parseTitle('(3) Card Lot 2024 Bowman Chrome 1st Jesus Made Base + Refractor', 'Jesus Made').noise, 'lot');
+  assert.strictEqual(Cards.parseTitle('2025 Bowman Chrome Jumbo Box Break Random Team PYT Blue Jays', 'A B').noise, 'break');
+  assert.strictEqual(Cards.parseTitle('2025 Bowman Chrome Jumbo Box Break Random Team PYT Blue Jays', 'A B').variant, 'Base', 'Blue Jays is a team');
+  assert.strictEqual(Cards.describeCard(Cards.parseTitle('2024 Bowman Chrome 1st Jesus Made Gold Refractor Auto /50 PSA 10', 'Jesus Made')),
+    '1st Bowman Auto · Gold /50 · PSA 10');
 });

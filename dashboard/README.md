@@ -18,3 +18,9 @@ Sold prices come from a second file, *Sold prices*, which starts empty. Replace
 it in the dashboard's Sources panel with the CSV downloaded from the extension
 (rankings page, Sold prices, Download CSV). The table then gains Sold and
 Median sold columns, and the player history card lists his saved sales.
+
+The **Sold prices by parallel** panel filters sales by card (1st Bowman autos,
+autos, non-autos), parallel, numbering, grading, and leaves lots and breaks
+out unless asked. It charts the median price of each parallel for the players
+the top filters keep. The table's Sold columns and each player's sales list
+follow the same choices.

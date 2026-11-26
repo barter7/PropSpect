@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "Prospect Rank for eBay",
-  "version": "0.5.1",
+  "version": "0.6.0",
   "description": "Shows a baseball prospect's ranking next to their name in eBay card listings, and saves sold prices of ranked players.",
   "permissions": [
     "storage",
@@ -24,6 +24,7 @@
         "src/match.js",
         "src/history.js",
         "src/chart.js",
+        "src/cards.js",
         "src/sales.js",
         "src/content.js"
       ],

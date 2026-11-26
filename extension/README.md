@@ -95,6 +95,16 @@ for each ranked player on it.
   **Remove all**.
 - On a Best Offer sale eBay shows only the asking price, so those rows are
   marked and left out of medians.
+- Each sale's card is read from the listing title: year, product (Bowman,
+  Bowman Chrome, Bowman Draft Chrome, Sapphire, Sterling, ...), **1st Bowman**,
+  **autograph**, **parallel** (Refractor, Blue, Gold, Gold Shimmer, Blue Wave,
+  Superfractor, ...), **numbering** (`/50`, and the serial when given, `23/50`),
+  grade (`PSA 10`, `BGS 9.5`), and whether it is a lot, break or sealed product
+  rather than one card. These are columns in the CSV (`src/cards.js`). A
+  parallel the title doesn't name but numbers shows as `Numbered`; one it
+  neither names nor numbers shows as `Base`. Team names (Red Sox, Blue Jays)
+  and the player's own name are ignored when looking for colours. The reading
+  is done at export, so later fixes to it apply to sales already saved.
 - Everything stays in the browser until you download it. To show it on the
   Prospect Board dashboard, replace its *Sold prices* file in Sources with the
   CSV.

@@ -52,6 +52,14 @@
   .pb-sales td.pb-num { text-align: right; padding-right: 12px; }
   .pb-sales td.pb-t { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .pb-sales a { color: var(--color-fg); }
+  .pb-sales td.pb-k { line-height: 1.35; }
+  @media (max-width: 560px) { .pb-sales .pb-title { display: none; } .pb-sales col.pb-title { width: 0; } }
+  .pb-variants { position: relative; min-height: 60px; margin-top: 10px; }
+  .pb-variants svg { display: block; max-width: 100%; overflow: visible; }
+  .pb-variants text { font-family: var(--font-anthropic-sans); font-size: 12px; fill: var(--cds-text-secondary); font-variant-numeric: tabular-nums; }
+  .pb-variants .pb-val { fill: var(--color-fg); font-weight: var(--cds-font-weight-medium); }
+  .pb-sales-groups { display: flex; flex-wrap: wrap; gap: 6px; margin: 2px 0 8px; }
+  .pb-chip { font-size: var(--cds-font-size-caption); padding: 2px 8px; border: 1px solid var(--color-border-line); border-radius: 999px; font-variant-numeric: tabular-nums; }
   .pb-foot { display: flex; flex-wrap: wrap; gap: var(--cds-gap-sm); align-items: center; font-size: var(--cds-font-size-caption); color: var(--color-fg-muted); margin-top: 8px; }
   .pb-detail-name { font-size: var(--cds-font-size-heading); font-weight: var(--cds-font-weight-medium); }
   .pb-detail-bio { color: var(--color-fg-muted); font-size: var(--cds-font-size-caption); margin: 2px 0 10px; line-height: 1.5; }
@@ -154,6 +162,38 @@
     </section>
   </div>
 
+  <section class="pb-card" id="pb-sold">
+    <h2 class="pb-h2">Sold prices by parallel</h2>
+    <p class="pb-note">Median eBay sold price of each parallel, for the players the filters at the top keep and the cards chosen here. The Sold columns in the table and each player's sales follow these choices too. Card type, parallel and numbering are read from each listing's title.</p>
+    <div class="pb-controls" id="pb-cardfilters">
+      <label class="pb-field">Card
+        <select class="dash-select" id="pb-card" data-param="card">
+          <option value="">All cards</option>
+          <option value="1st-auto">1st Bowman autos</option>
+          <option value="1st">1st Bowman, auto or not</option>
+          <option value="auto">Autos</option>
+          <option value="nonauto">Non-autos</option>
+        </select></label>
+      <label class="pb-field">Parallel
+        <select class="dash-select" id="pb-variant" data-draw="variant-options" data-source="sales"></select></label>
+      <label class="pb-field">Numbered
+        <select class="dash-select" id="pb-num" data-draw="num-options" data-source="sales"></select></label>
+      <label class="pb-field">Graded
+        <select class="dash-select" id="pb-graded" data-param="graded">
+          <option value="">Raw or graded</option>
+          <option value="raw">Raw only</option>
+          <option value="graded">Graded only</option>
+          <option value="psa10">PSA 10 only</option>
+        </select></label>
+      <label class="pb-field">Lots and breaks
+        <select class="dash-select" id="pb-lots" data-param="lots">
+          <option value="">Left out</option>
+          <option value="show">Included</option>
+        </select></label>
+    </div>
+    <div class="pb-variants" data-draw="variants" data-source="variant_prices"></div>
+  </section>
+
   <section id="pb-players">
     <h2 class="pb-h2">Players</h2>
     <div class="pb-controls pb-listbar">
@@ -180,7 +220,7 @@
           <th data-field="bonus" data-sort="bonus" class="pb-num"><button class="pb-sort" type="button">Bonus ($)</button></th>
           <th data-field="fv_first" data-sort="fv_first" class="pb-num"><button class="pb-sort" type="button">First FV</button></th>
           <th data-field="fv_change" data-sort="fv_change" class="pb-num"><button class="pb-sort" type="button">FV change</button></th>
-          <th data-field="sales" data-source="player_sales" data-sort="sales_n" class="pb-num"><button class="pb-sort" type="button">Sold</button></th>
+          <th data-field="sales" data-source="player_sales" data-sort="sales_n" class="pb-num"><button class="pb-sort" type="button" title="Sold listings saved, for the cards chosen under Sold prices by parallel">Sold</button></th>
           <th data-field="median_price" data-source="player_sales" data-sort="sale_median" class="pb-num"><button class="pb-sort" type="button">Median sold ($)</button></th>
           <th data-field="last_list" data-sort="last_list"><button class="pb-sort" type="button">List</button></th>
         </tr></thead>
@@ -208,7 +248,7 @@
   const POS = {
     pit: /P$|^TWP$/i, c: /^C(\/|$)/i, inf: /^(1B|2B|3B|SS|INF|UTIL|4C)/i, of: /^(LF|CF|RF|OF)/i,
   };
-  const DEFAULTS = { list: '', status: 'Current', team: '', pos: '', fv: '', sign: '', year: '', q: '', sort: 'fv_value', dir: 'desc', sel: '', show: 100 };
+  const DEFAULTS = { card: '', variant: '', num: '', graded: '', lots: '', list: '', status: 'Current', team: '', pos: '', fv: '', sign: '', year: '', q: '', sort: 'fv_value', dir: 'desc', sel: '', show: 100 };
   const fold = (s) => String(s || '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase();
   const num = (v) => (v === '' || v == null || isNaN(+v) ? null : +v);
   const listOrder = (k) => +k.slice(0, 4) * 2 + (k.endsWith('u') ? 1 : 0);
@@ -284,6 +324,26 @@
     }
     return out;
   }
+  // Does a saved sale fit the card choices (type, parallel, numbering, grading, lots)?
+  function cardOk(s, p) {
+    const yes = (v) => String(v).toLowerCase() === 'yes' || v === true;
+    if (p.card === '1st-auto' && !(yes(s.first_bowman) && yes(s.auto))) return false;
+    if (p.card === '1st' && !yes(s.first_bowman)) return false;
+    if (p.card === 'auto' && !yes(s.auto)) return false;
+    if (p.card === 'nonauto' && yes(s.auto)) return false;
+    if (p.variant && (s.variant || 'Base') !== p.variant) return false;
+    const n = num(s.numbered_to);
+    if (p.num === 'numbered' && n == null) return false;
+    if (p.num === 'unnumbered' && n != null) return false;
+    if (/^\d+$/.test(String(p.num)) && n !== +p.num) return false;
+    if (p.graded === 'raw' && s.grader) return false;
+    if (p.graded === 'graded' && !s.grader) return false;
+    if (p.graded === 'psa10' && !(s.grader === 'PSA' && String(s.grade) === '10')) return false;
+    if (p.lots !== 'show' && s.noise) return false;
+    return true;
+  }
+  const cardLabel = (s) => (s.variant || 'Base') + (num(s.numbered_to) != null ? ` /${num(s.numbered_to)}` : '');
+  const median = (xs) => { const v = xs.slice().sort((a, b) => a - b); return v.length ? (v[Math.floor((v.length - 1) / 2)] + v[Math.ceil((v.length - 1) / 2)]) / 2 : null; };
   const priced = (rows) => rows.filter((s) => s.format !== 'Best Offer' && num(s.price) != null);
   function salesByKey() {
     const s = dash.data('player_sales');
@@ -338,11 +398,14 @@
   });
   dash.calc('player_sales', {
     title: 'Sold prices per player',
-    description: 'For each player with saved sold listings: how many, the median and latest price (Best Offer sales are counted but not priced, since eBay hides the accepted offer), and the latest sale date.',
+    description: 'For each player with saved sold listings of the chosen cards: how many, the median and latest price (Best Offer sales are counted but not priced, since eBay hides the accepted offer), and the latest sale date.',
     inputs: ['players', 'sales'],
     fn: (players, sales) => {
       const rows = [];
-      for (const [key, list] of salesFor(players, sales)) {
+      const prm = P();
+      for (const [key, all] of salesFor(players, sales)) {
+        const list = all.filter((s) => cardOk(s, prm));
+        if (!list.length) continue;
         const p = priced(list).map((s) => ({ price: +s.price, date: s.sold_date || '' }));
         const prices = p.map((x) => x.price).sort((a, b) => a - b);
         const median = prices.length ? (prices[Math.floor((prices.length - 1) / 2)] + prices[Math.ceil((prices.length - 1) / 2)]) / 2 : null;
@@ -351,6 +414,31 @@
           last_price: last ? last.price : null, last_sold: last ? last.date : '' });
       }
       return rows;
+    },
+  });
+  dash.calc('variant_prices', {
+    title: 'Median sold price by parallel',
+    description: 'Sold listings of the players the filters keep and the cards chosen, grouped by parallel and numbering, with the median price (Best Offer sales left out, since eBay hides the accepted offer).',
+    inputs: ['players', 'sales'],
+    fn: (players, sales) => {
+      const prm = P();
+      const keep = new Set(filtered(players, { nosort: true, list: '' }).map((r) => r.key));
+      const groups = new Map();
+      for (const [key, list] of salesFor(players, sales)) {
+        if (!keep.has(key)) continue;
+        for (const s of list) {
+          if (!cardOk(s, prm)) continue;
+          const label = cardLabel(s);
+          if (!groups.has(label)) groups.set(label, { parallel: label, numbered_to: num(s.numbered_to), sales: 0, prices: [] });
+          const g = groups.get(label);
+          g.sales++;
+          if (s.format !== 'Best Offer' && num(s.price) != null) g.prices.push(+s.price);
+        }
+      }
+      return [...groups.values()].map((g) => ({ parallel: g.parallel, numbered_to: g.numbered_to, sales: g.sales, priced: g.prices.length,
+        median_price: g.prices.length ? Math.round(median(g.prices) * 100) / 100 : null }))
+        // Unnumbered first, then scarcer and scarcer (/499 down to 1/1).
+        .sort((a, b) => (a.numbered_to == null ? -1 : 0) - (b.numbered_to == null ? -1 : 0) || (b.numbered_to || 0) - (a.numbered_to || 0) || a.parallel.localeCompare(b.parallel));
     },
   });
   dash.calc('tiers', {
@@ -411,6 +499,70 @@
     }));
   });
 
+  // Card choices for sold prices.
+  document.querySelectorAll('#pb-cardfilters select[data-param]').forEach((sel) => {
+    sel.addEventListener('change', () => dash.setParams({ [sel.dataset.param]: sel.value || null }));
+  });
+  function saleOptions(name, param, allLabel, build) {
+    dash.draw(name, (sel) => {
+      const s = dash.data('sales');
+      const rows = s.status === 'ok' && Array.isArray(s.data) ? s.data : [];
+      sel.replaceChildren(new Option(allLabel, ''), ...build(rows));
+      const want = P()[param] || '';
+      if (want && ![...sel.options].some((o) => o.value === want)) sel.appendChild(new Option(want, want));
+      sel.value = want;
+      sel.onchange = () => dash.setParams({ [param]: sel.value || null });
+    });
+  }
+  saleOptions('variant-options', 'variant', 'Any parallel', (rows) => {
+    const count = d3.rollup(rows, (v) => v.length, (s) => s.variant || 'Base');
+    return [...count].sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0])).map(([v, n]) => new Option(`${v} (${n})`, v));
+  });
+  saleOptions('num-options', 'num', 'Numbered or not', (rows) => {
+    const ns = [...new Set(rows.map((s) => num(s.numbered_to)).filter((n) => n != null))].sort((a, b) => b - a);
+    return [new Option('Numbered only', 'numbered'), new Option('Unnumbered only', 'unnumbered'), ...ns.map((n) => new Option(n === 1 ? '1/1' : `/${n}`, String(n)))];
+  });
+
+  // Bars: median sold price of each parallel.
+  dash.draw('variants', (box) => {
+    const s = dash.data('variant_prices');
+    const say = (t) => box.replaceChildren(Object.assign(document.createElement('p'), { className: 'pb-msg', textContent: t }));
+    if (s.status === 'loading') return say('Loading sold prices…');
+    if (s.status !== 'ok') return say('The sold prices did not load.');
+    const src = dash.data('sales');
+    if (src.status === 'ok' && !src.data.length) return say('No sold prices saved yet. Browse eBay with the Sold items filter and the Prospect Rank extension on, then replace the Sold prices file in Sources with its CSV.');
+    const data = s.data.filter((d) => d.median_price != null);
+    if (!data.length) return say(s.data.length ? 'Only Best Offer sales match, and eBay hides their accepted prices.' : 'No saved sales match these choices.');
+    const usd = (v) => '$' + d3.format(',.0f')(v);
+    const W = Math.max(280, box.clientWidth), ROW = 26, TOP = 4;
+    const ctx = document.createElement('canvas').getContext('2d');
+    ctx.font = '12px sans-serif';
+    const L = Math.min(170, Math.ceil(d3.max(data, (d) => ctx.measureText(d.parallel).width)) + 12);
+    const R = 120, H = TOP + data.length * ROW + 4;
+    const x = d3.scaleLinear().domain([0, d3.max(data, (d) => d.median_price)]).range([L, W - R]);
+    const svg = d3.create('svg').attr('width', W).attr('height', H).attr('role', 'img')
+      .attr('aria-label', 'Median sold price by parallel: ' + data.map((d) => `${d.parallel} ${usd(d.median_price)} from ${d.priced} sales`).join(', '));
+    const tip = d3.create('div').attr('class', 'pb-tip').property('hidden', true);
+    const g = svg.selectAll('g').data(data).join('g').attr('transform', (d, i) => `translate(0,${TOP + i * ROW})`);
+    g.append('text').attr('x', L - 8).attr('y', ROW / 2 + 4).attr('text-anchor', 'end').text((d) => d.parallel);
+    g.append('rect').attr('x', L).attr('y', 5).attr('height', ROW - 10).attr('rx', 3)
+      .attr('width', (d) => Math.max(2, x(d.median_price) - L)).style('fill', dash.colors[0]);
+    g.append('text').attr('class', 'pb-val').attr('x', (d) => x(d.median_price) + 6).attr('y', ROW / 2 + 4)
+      .text((d) => `${usd(d.median_price)}`).append('tspan').attr('class', '').style('font-weight', 400).style('fill', 'var(--cds-text-secondary)')
+      .text((d) => ` · ${d.priced} sale${d.priced === 1 ? '' : 's'}`);
+    g.append('rect').attr('x', 0).attr('y', 0).attr('width', W).attr('height', ROW).style('fill', 'transparent')
+      .on('pointerenter pointermove', (event, d) => {
+        const t = tip.node(), i = data.indexOf(d);
+        t.hidden = false;
+        t.textContent = `${d.parallel}: median ${usd(d.median_price)} from ${d.priced} priced sale${d.priced === 1 ? '' : 's'}` +
+          (d.sales > d.priced ? ` (+${d.sales - d.priced} Best Offer)` : '');
+        t.style.left = Math.min(L, W - t.offsetWidth) + 'px';
+        t.style.top = Math.max(0, TOP + i * ROW - 30) + 'px';
+      })
+      .on('pointerleave', () => { tip.node().hidden = true; });
+    box.replaceChildren(svg.node(), tip.node());
+  });
+
   // The list chooser, newest list first, with how many players each one holds.
   dash.draw('list-options', (sel) => {
     const s = dash.data('players');
@@ -453,6 +605,9 @@
     const p = P();
     document.querySelectorAll('#pb-filters select[data-param]').forEach((sel) => {
       if (document.activeElement !== sel && !sel.dataset.draw) sel.value = p[sel.dataset.param] || '';
+    });
+    document.querySelectorAll('#pb-cardfilters select[data-param]').forEach((sel) => {
+      if (document.activeElement !== sel) sel.value = p[sel.dataset.param] || '';
     });
     document.querySelectorAll('#pb-status').forEach((el) => { el.disabled = !!p.list; });
     document.querySelectorAll('#pb-listnote').forEach((el) => { el.hidden = !p.list; });
@@ -554,38 +709,52 @@
     const src = dash.data('sales');
     if (src.status === 'loading') { sum.textContent = 'Loading sold prices…'; return wrap; }
     if (src.status !== 'ok') { sum.textContent = 'The sold prices file did not load.'; return wrap; }
-    const list = (salesFor(all, src.data).get(r.key) || []).slice().sort((a, b) => String(b.sold_date).localeCompare(String(a.sold_date)));
+    const mine = salesFor(all, src.data).get(r.key) || [];
+    const prm = P();
+    const list = mine.filter((x) => cardOk(x, prm)).sort((a, b) => String(b.sold_date).localeCompare(String(a.sold_date)));
     if (!list.length) {
-      sum.textContent = src.data.length
-        ? 'No sold listings saved for him yet.'
+      sum.textContent = mine.length
+        ? `${mine.length} sold listing${mine.length === 1 ? '' : 's'} saved for him, none of the cards chosen under Sold prices by parallel.`
+        : src.data.length ? 'No sold listings saved for him yet.'
         : 'No sold prices saved yet. Browse eBay with the Sold items filter and the Prospect Rank extension on, then replace the Sold prices file in Sources with its CSV.';
       return wrap;
     }
     const pr = priced(list).map((s) => +s.price).sort((a, b) => a - b);
-    const med = pr.length ? (pr[Math.floor((pr.length - 1) / 2)] + pr[Math.ceil((pr.length - 1) / 2)]) / 2 : null;
+    const med = median(pr);
     const usd = (v) => '$' + d3.format(',.2f')(v);
+    // One chip per parallel: median price and count.
+    const groups = d3.groups(list, cardLabel).map(([label, v]) => ({ label, n: v.length, m: median(priced(v).map((x) => +x.price)), of: num(v[0].numbered_to) }))
+      .sort((a, b) => (a.of == null ? -1 : 0) - (b.of == null ? -1 : 0) || (b.of || 0) - (a.of || 0));
+    const chips = Object.assign(document.createElement('div'), { className: 'pb-sales-groups' });
+    for (const gr of groups) chips.appendChild(Object.assign(document.createElement('span'), { className: 'pb-chip',
+      textContent: `${gr.label}: ${gr.m != null ? usd(gr.m) : 'Best Offer only'} · ${gr.n}` }));
     sum.textContent = `${list.length} saved` + (pr.length ? ` · median ${usd(med)} · range ${usd(pr[0])} to ${usd(pr[pr.length - 1])}` : '') +
       (pr.length < list.length ? ` · ${list.length - pr.length} Best Offer sale${list.length - pr.length > 1 ? 's' : ''} not priced` : '');
     const table = document.createElement('table');
     const col = (w) => Object.assign(document.createElement('col'), { style: `width:${w}` });
     const cg = document.createElement('colgroup');
-    cg.append(col('84px'), col('86px'), col('auto'));
+    cg.append(col('84px'), col('86px'), col('34%'), Object.assign(col('auto'), { className: 'pb-title' }));
     table.appendChild(cg);
     for (const s of list.slice(0, 8)) {
       const tr = document.createElement('tr');
       const d = Object.assign(document.createElement('td'), { textContent: s.sold_date || '' });
       const p = Object.assign(document.createElement('td'), { className: 'pb-num',
         textContent: num(s.price) == null ? '' : (s.format === 'Best Offer' ? 'ask ' : '') + usd(+s.price) });
-      const t = Object.assign(document.createElement('td'), { className: 'pb-t' });
+      const t = Object.assign(document.createElement('td'), { className: 'pb-t pb-title' });
       const url = String(s.url || '');
       if (/^https:\/\/(www\.)?ebay\.[a-z.]+\//.test(url)) {
         const a = Object.assign(document.createElement('a'), { href: url, target: '_blank', rel: 'noopener', textContent: s.title || url });
         t.appendChild(a);
       } else t.textContent = s.title || '';
       t.title = s.title || '';
-      tr.append(d, p, t);
+      const k = Object.assign(document.createElement('td'), { className: 'pb-k' });
+      k.textContent = [String(s.first_bowman) === 'yes' ? '1st' : '', String(s.auto) === 'yes' ? 'Auto' : '', cardLabel(s),
+        s.grader ? `${s.grader} ${s.grade}` : ''].filter(Boolean).join(' · ');
+      k.title = k.textContent;
+      tr.append(d, p, k, t);
       table.appendChild(tr);
     }
+    wrap.insertBefore(chips, null);
     wrap.appendChild(table);
     if (list.length > 8) wrap.appendChild(Object.assign(document.createElement('div'), { className: 'pb-sales-sum', textContent: `Showing the 8 most recent of ${list.length}.` }));
     return wrap;
@@ -648,8 +817,11 @@
     if (signed) {
       svg.append('line').attr('x1', LEFT).attr('x2', x(0)).attr('y1', axisY).attr('y2', axisY).style('stroke', 'var(--cds-chart-axis)').style('stroke-dasharray', '2 3');
       svg.append('circle').attr('cx', LEFT).attr('cy', axisY).attr('r', 3.5).style('fill', 'var(--color-panel)').style('stroke', 'var(--cds-text-secondary)').style('stroke-width', 1.5);
-      svg.append('text').attr('class', 'pb-val').attr('x', LEFT).attr('y', axisY + 14).attr('text-anchor', 'middle').text(signed);
-      svg.append('text').attr('x', LEFT).attr('y', axisY + 26).attr('text-anchor', 'middle').text('Signed');
+      // Labels only when they clear the first list's labels; the open circle still marks the signing year.
+      if (x(0) - LEFT >= 58) {
+        svg.append('text').attr('class', 'pb-val').attr('x', LEFT).attr('y', axisY + 14).attr('text-anchor', 'middle').text(signed);
+        svg.append('text').attr('x', LEFT).attr('y', axisY + 26).attr('text-anchor', 'middle').text('Signed');
+      }
     }
     if (lists.length > 1) svg.append('line').attr('x1', x(0)).attr('x2', x(lists.length - 1)).attr('y1', axisY).attr('y2', axisY).style('stroke', 'var(--cds-chart-axis)');
     const room = Math.max(1, Math.ceil(42 / (step || 42)));

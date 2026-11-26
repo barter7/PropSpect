@@ -2,6 +2,7 @@
 // Pure functions here (used by the content script, the extension pages and the tests);
 // the content script does the DOM and storage work.
 (function (root) {
+  const Cards = root.ProspectCards || (typeof require !== 'undefined' ? require('./cards.js') : null);
   const MONTHS = { jan: 0, feb: 1, mar: 2, apr: 3, may: 4, jun: 5, jul: 6, aug: 7, sep: 8, oct: 9, nov: 10, dec: 11 };
   const iso = (y, m, d) => `${y}-${String(m + 1).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
 
@@ -109,15 +110,22 @@
     };
   }
 
-  const COLUMNS = ['sold_date', 'player', 'team', 'pos', 'price', 'currency', 'shipping', 'format', 'note', 'bids', 'mlb_rank',
-    'mlb_org_rank', 'fg_fv', 'fg_rank', 'fg_org_rank', 'title', 'url', 'item_id', 'saved_at'];
+  const CARD_COLUMNS = ['year', 'product', 'first_bowman', 'auto', 'variant', 'numbered_to', 'serial', 'grader', 'grade', 'noise'];
+  const COLUMNS = ['sold_date', 'player', 'team', 'pos', 'price', 'currency', 'shipping', 'format', 'note', 'bids',
+    ...CARD_COLUMNS, 'mlb_rank', 'mlb_org_rank', 'fg_fv', 'fg_rank', 'fg_org_rank', 'title', 'url', 'item_id', 'saved_at'];
+
+  // The card fields, read from the title now rather than when saved, so a better reading reaches old rows too.
+  function withCard(r) {
+    const c = Cards.parseTitle(r.title, r.player);
+    return Object.assign({}, r, c, { first_bowman: c.first_bowman ? 'yes' : 'no', auto: c.auto ? 'yes' : 'no' });
+  }
 
   function toCsv(records) {
     const cell = (v) => {
       const s = v == null ? '' : String(v);
       return /[",\n\r]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
     };
-    const rows = [...records].sort((a, b) => (b.sold_date || '').localeCompare(a.sold_date || '') || a.player.localeCompare(b.player));
+    const rows = records.map(withCard).sort((a, b) => (b.sold_date || '').localeCompare(a.sold_date || '') || a.player.localeCompare(b.player));
     return [COLUMNS.join(','), ...rows.map((r) => COLUMNS.map((c) => cell(r[c])).join(','))].join('\n') + '\n';
   }
 
@@ -133,7 +141,7 @@
     return { count: records.length, priced: prices.length, median: mid, low: prices[0], high: prices[prices.length - 1], last };
   }
 
-  const api = { parseDate, parsePrice, parseCard, parseItemPage, itemId, record, toCsv, summarize, COLUMNS };
+  const api = { parseDate, parsePrice, parseCard, parseItemPage, itemId, record, toCsv, summarize, withCard, COLUMNS };
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
   else root.ProspectSales = api;
 })(typeof globalThis !== 'undefined' ? globalThis : this);

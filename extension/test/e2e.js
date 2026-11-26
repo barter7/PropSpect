@@ -207,8 +207,8 @@ const HISTORY = {
     await mgr.bringToFront();
     const [dl] = await Promise.all([mgr.waitForEvent('download'), mgr.click('#sales-download')]);
     const csv = fs.readFileSync(await dl.path(), 'utf8').split('\n');
-    assert.strictEqual(csv[0], 'sold_date,player,team,pos,price,currency,shipping,format,note,bids,mlb_rank,mlb_org_rank,fg_fv,fg_rank,fg_org_rank,title,url,item_id,saved_at');
-    assert.match(csv[1], /^2026-11-20,Dario Vance,PIT,SS,1234.56,\$,4.99,Auction,,12,1,1,60,2,1,2025 Bowman Chrome 1st Dario Vance Auto \/99 PSA 10,https:\/\/www.ebay.com\/itm\/356000000001,356000000001,/);
+    assert.strictEqual(csv[0], 'sold_date,player,team,pos,price,currency,shipping,format,note,bids,year,product,first_bowman,auto,variant,numbered_to,serial,grader,grade,noise,mlb_rank,mlb_org_rank,fg_fv,fg_rank,fg_org_rank,title,url,item_id,saved_at');
+    assert.match(csv[1], /^2026-11-20,Dario Vance,PIT,SS,1234.56,\$,4.99,Auction,,12,2025,Bowman Chrome,yes,yes,Numbered,99,,PSA,10,,1,1,60,2,1,2025 Bowman Chrome 1st Dario Vance Auto \/99 PSA 10,https:\/\/www.ebay.com\/itm\/356000000001,356000000001,/);
     assert.ok(csv.some((l) => /J\.J\. Okafor.*Best Offer,asking price; accepted offer not shown/.test(l)));
     assert.strictEqual(csv.filter(Boolean).length, 5);
     // Saving can be switched off in the popup; nothing new is saved then.
