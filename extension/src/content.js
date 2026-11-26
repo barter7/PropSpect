@@ -113,13 +113,22 @@
       const id = ProspectSales.itemId(location.href);
       const priceEl = document.querySelector('.x-price-primary, [itemprop="price"], .x-bin-price, #prcIsum, #mm-saleDscPrc');
       const sale = id && ProspectSales.parseItemPage(document.body.innerText, priceEl ? priceEl.textContent : '');
-      return sale ? { sale, id, url: location.href, page: 'item' } : null;
+      const img = document.querySelector('.ux-image-carousel-item.active img, .ux-image-carousel-item img, #icImg, img[src*="i.ebayimg.com"]');
+      return sale ? { sale, id, url: location.href, page: 'item', image: imageUrl(img) } : null;
     }
     const cardEl = el.closest('li.s-item, li.s-card, .s-item, .s-card, li') || el.parentElement;
     const id = link && ProspectSales.itemId(link.href);
     if (!cardEl || !id || /^12345678/.test(id)) return null; // eBay's placeholder card
     const sale = ProspectSales.parseCard(cardEl.innerText || cardEl.textContent);
-    return sale ? { sale, id, url: link.href, page: 'search' } : null;
+    return sale ? { sale, id, url: link.href, page: 'search', image: imageUrl(cardEl.querySelector('img')) } : null;
+  }
+
+  // The listing photo's address, asked for at eBay's largest size (lazy images keep it in data-src or srcset).
+  function imageUrl(img) {
+    if (!img) return '';
+    const cands = [img.getAttribute('src'), img.getAttribute('data-src'), (img.getAttribute('srcset') || '').split(/\s+/)[0]];
+    for (const c of cands) { const u = ProspectPhotos.largeImageUrl(c); if (u) return u; }
+    return '';
   }
 
   // A small note in the corner of a Sold page that says what this tab has saved, so you know when it is done.
@@ -162,7 +171,7 @@
     try { found = soldListing(el); } catch (e) { return; }
     if (!found) return;
     for (const p of players) {
-      const r = ProspectSales.record(found.sale, { id: found.id, url: found.url, title, page: found.page }, p);
+      const r = ProspectSales.record(found.sale, { id: found.id, url: found.url, title, page: found.page, image: found.image }, p);
       pending.set(r.key, r);
     }
     if (toast && toast.dataset.state !== 'done') setToast('Prospect Rank: saving sold listings…', 'busy');

@@ -291,3 +291,31 @@ test('reads the grading company, grade and autograph grade', () => {
   assert.deepStrictEqual(g('2024 Bowman Chrome 1st Auto SGC 9.5 /99'), [true, 'SGC', '9.5', '', 99]);
   assert.deepStrictEqual(g('2024 Bowman Chrome 1st Auto Raw /499'), [false, '', '', '', 499]);
 });
+
+const Photos = require('../src/photos.js');
+test('builds photo-reading requests and combines readings with the title', () => {
+  assert.strictEqual(Photos.largeImageUrl('https://i.ebayimg.com/images/g/abc/s-l225.jpg'), 'https://i.ebayimg.com/images/g/abc/s-l1600.jpg');
+  assert.strictEqual(Photos.largeImageUrl('https://example.com/a/s-l225.jpg'), '', 'only eBay image addresses');
+  const req = Photos.buildRequest('Title', 'QUJD', 'image/webp');
+  assert.strictEqual(req.model, 'claude-opus-5-5');
+  assert.deepStrictEqual(req.messages[0].content[0], { type: 'image', source: { type: 'base64', media_type: 'image/webp', data: 'QUJD' } });
+  assert.strictEqual(req.output_config.format.type, 'json_schema');
+  assert.strictEqual(req.thinking, undefined, 'Opus 5.5 always thinks; no thinking setting is sent');
+  assert.throws(() => Photos.parseResponse({ stop_reason: 'refusal', content: [] }), /declined/);
+  assert.throws(() => Photos.parseResponse({ stop_reason: 'max_tokens', content: [] }), /cut off/);
+  assert.throws(() => Photos.parseResponse({ type: 'error', error: { message: 'bad key' } }), /bad key/);
+
+  const card = (over) => Object.assign({ graded: false, grader: '', grade: '', auto_grade: '', auto: true, variant: 'Numbered', numbered_to: 50, serial: null }, over);
+  const reading = (over) => ({ reading: Object.assign({ picture: 'one card', slabbed: null, grader: null, grade: null, auto_grade: null, cert_number: null,
+    label_text: null, parallel_colour: null, serial_number: null, numbered_to: null, autograph_visible: null, confidence: 'high', notes: '' }, over) });
+  // Title says PSA 10, photo shows a raw card: the photo wins.
+  const raw = Photos.combine(card({ graded: true, grader: 'PSA', grade: '10' }), reading({ slabbed: false }));
+  assert.deepStrictEqual([raw.graded, raw.grader, raw.photo_mismatch], [false, '', 'grade: title PSA 10, photo shows a raw card']);
+  // Numbering disagreement, colour filled in.
+  const num = Photos.combine(card({}), reading({ numbered_to: 25, serial_number: '#7/25', parallel_colour: 'ORANGE' }));
+  assert.deepStrictEqual([num.numbered_to, num.serial, num.variant, num.photo_mismatch], [25, 7, 'Orange', 'numbered: title /50, photo /25']);
+  // A stock photo or several cards is noted but never trusted.
+  const stock = Photos.combine(card({}), reading({ picture: 'stock or generic image', numbered_to: 99 }));
+  assert.deepStrictEqual([stock.numbered_to, stock.card_source], [50, 'title']);
+  assert.deepStrictEqual(Photos.combine(card({}), undefined).card_source, 'title');
+});

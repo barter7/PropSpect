@@ -81,7 +81,7 @@
   }
 
   // A sale record for one ranked player named in a sold listing. A dual-player card gives one per player.
-  function record(sale, { id, url, title, page }, player, now) {
+  function record(sale, { id, url, title, page, image }, player, now) {
     const m = player.mlb || {}, f = player.fg || {};
     return {
       key: `${id}|${player.name}`,
@@ -105,6 +105,7 @@
       title,
       url: `https://www.ebay.com/itm/${id}`,
       source_url: url,
+      image_url: image || '',
       page,
       saved_at: new Date(now || Date.now()).toISOString(),
     };
@@ -114,13 +115,20 @@
   const AT_SALE_COLUMNS = ['fg_list_at_sale', 'fg_fv_at_sale', 'fg_rank_at_sale', 'fg_org_rank_at_sale',
     'mlb_list_at_sale', 'mlb_rank_at_sale', 'mlb_org_rank_at_sale'];
   const CARD_COLUMNS = ['year', 'product', 'first_bowman', 'auto', 'variant', 'numbered_to', 'serial', 'graded', 'grader', 'grade', 'auto_grade', 'noise'];
+  const Photos = () => root.ProspectPhotos || (typeof require !== 'undefined' ? require('./photos.js') : null);
+  const PHOTO_COLUMNS = ['photo_read', 'photo_picture', 'photo_slabbed', 'photo_grader', 'photo_grade', 'photo_auto_grade', 'photo_cert',
+    'photo_label', 'photo_parallel', 'photo_serial', 'photo_autograph', 'photo_confidence', 'photo_notes'];
   const COLUMNS = ['sold_date', 'player', 'team', 'pos', 'price', 'currency', 'shipping', 'format', 'note', 'bids',
-    ...CARD_COLUMNS, ...AT_SALE_COLUMNS, 'fg_fv_when_saved', 'fg_rank_when_saved', 'fg_org_rank_when_saved', 'mlb_rank_when_saved',
-    'mlb_org_rank_when_saved', 'title', 'url', 'item_id', 'saved_at'];
+    ...CARD_COLUMNS, 'card_source', 'photo_mismatch', ...AT_SALE_COLUMNS, 'fg_fv_when_saved', 'fg_rank_when_saved', 'fg_org_rank_when_saved', 'mlb_rank_when_saved',
+    'mlb_org_rank_when_saved', ...PHOTO_COLUMNS, 'title', 'url', 'image_url', 'item_id', 'saved_at'];
 
   // The card fields, read from the title now rather than when saved, so a better reading reaches old rows too.
-  function withCard(r) {
-    const c = Cards.parseTitle(r.title, r.player);
+  // photo (optional): a photo reading for this listing (photos.js), combined with the title's reading.
+  function withCard(r, photo) {
+    const P = Photos();
+    const fromTitle = Cards.parseTitle(r.title, r.player);
+    const c = P ? P.combine(fromTitle, photo) : Object.assign({}, fromTitle, { card_source: 'title', photo_mismatch: '' });
+    if (P) Object.assign(c, P.columns(photo));
     return Object.assign({}, r, c, { first_bowman: c.first_bowman ? 'yes' : 'no', auto: c.auto ? 'yes' : 'no', graded: c.graded ? 'yes' : 'no',
       // The ranks shown when the listing was saved, which may be after the sale.
       fg_fv_when_saved: r.fg_fv, fg_rank_when_saved: r.fg_rank, fg_org_rank_when_saved: r.fg_org_rank,
@@ -134,7 +142,8 @@
       const s = v == null ? '' : String(v);
       return /[",\n\r]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
     };
-    const rows = records.map((r) => Object.assign(withCard(r), ctx ? AsOf.atSale(r, ctx) : {})).sort((a, b) => (b.sold_date || '').localeCompare(a.sold_date || '') || a.player.localeCompare(b.player));
+    const photos = (ctx && ctx.photoReads) || {};
+    const rows = records.map((r) => Object.assign(withCard(r, photos[r.item_id]), ctx ? AsOf.atSale(r, ctx) : {})).sort((a, b) => (b.sold_date || '').localeCompare(a.sold_date || '') || a.player.localeCompare(b.player));
     return [COLUMNS.join(','), ...rows.map((r) => COLUMNS.map((c) => cell(r[c])).join(','))].join('\n') + '\n';
   }
 

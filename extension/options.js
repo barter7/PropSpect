@@ -124,8 +124,9 @@ $('hist-clear').addEventListener('click', () => chrome.storage.local.remove('his
 // Sold prices saved from eBay.
 let salesCtx = {};
 function renderSales() {
-  chrome.storage.local.get(['sales', 'history', 'mlbSnaps', 'listDates'], ({ sales, history, mlbSnaps, listDates }) => {
-    salesCtx = { history: history || null, mlbSnaps: mlbSnaps || null, overrides: listDates || {} };
+  chrome.storage.local.get(['sales', 'history', 'mlbSnaps', 'listDates', 'photoReads'], ({ sales, history, mlbSnaps, listDates, photoReads }) => {
+    salesCtx = { history: history || null, mlbSnaps: mlbSnaps || null, overrides: listDates || {}, photoReads: photoReads || {} };
+    renderPhotos(sales, photoReads);
     renderDates(history, mlbSnaps, listDates || {});
     const all = Object.values(sales || {});
     const players = new Set(all.map((r) => r.player)).size;
@@ -143,7 +144,11 @@ function renderSales() {
       const then = ProspectAsOf.atSale(r, salesCtx);
       const thenText = [then.fg_fv_at_sale ? `${then.fg_fv_at_sale} FV (${then.fg_list_at_sale})` : then.fg_list_at_sale ? `not on FG ${then.fg_list_at_sale}` : '',
         then.mlb_rank_at_sale != null ? `MLB #${then.mlb_rank_at_sale}` : then.mlb_org_rank_at_sale != null ? `MLB org #${then.mlb_org_rank_at_sale}` : ''].filter(Boolean).join(' · ');
-      for (const v of [r.sold_date, `${r.player} (${r.team})`, price, ProspectCards.describeCard(ProspectCards.parseTitle(r.title, r.player)), r.format + (r.note ? ' *' : ''), thenText]) {
+      const photo = salesCtx.photoReads[r.item_id];
+      const card = ProspectPhotos.combine(ProspectCards.parseTitle(r.title, r.player), photo);
+      const cardText = ProspectCards.describeCard(card) + (card.card_source === 'title+photo' ? ' (photo checked)' : '') +
+        (card.photo_mismatch ? ` ⚠ ${card.photo_mismatch}` : '');
+      for (const v of [r.sold_date, `${r.player} (${r.team})`, price, cardText, r.format + (r.note ? ' *' : ''), thenText]) {
         const td = document.createElement('td');
         td.textContent = v == null ? '' : v;
         tr.appendChild(td);
@@ -161,8 +166,8 @@ function renderSales() {
   });
 }
 $('sales-download').addEventListener('click', () => {
-  chrome.storage.local.get(['sales', 'history', 'mlbSnaps', 'listDates'], ({ sales, history, mlbSnaps, listDates }) => {
-    const ctx = { history: history || null, mlbSnaps: mlbSnaps || null, overrides: listDates || {} };
+  chrome.storage.local.get(['sales', 'history', 'mlbSnaps', 'listDates', 'photoReads'], ({ sales, history, mlbSnaps, listDates, photoReads }) => {
+    const ctx = { history: history || null, mlbSnaps: mlbSnaps || null, overrides: listDates || {}, photoReads: photoReads || {} };
     const blob = new Blob([ProspectSales.toCsv(Object.values(sales || {}), ctx)], { type: 'text/csv' });
     const a = document.createElement('a');
     a.href = URL.createObjectURL(blob);
@@ -231,8 +236,49 @@ function renderDates(history, mlbSnaps, overrides) {
   }
 }
 
+// ---- Photo reading ----
+function renderPhotos(sales, photoReads) {
+  const reads = photoReads || {};
+  const items = new Map();
+  for (const r of Object.values(sales || {})) if (r.image_url && !items.has(r.item_id)) items.set(r.item_id, r);
+  const read = [...items.keys()].filter((id) => reads[id] && !reads[id].error).length;
+  const failed = [...items.keys()].filter((id) => reads[id] && reads[id].error).length;
+  const spent = Object.values(reads).reduce((a, x) => a + (x.cost || 0), 0);
+  const waiting = items.size - read - failed;
+  $('photos-current').textContent = items.size
+    ? `${items.size} saved sales have a photo: ${read} read, ${failed} failed, ${waiting} not read yet.` +
+      (spent ? ` Spent so far: about $${spent.toFixed(2)}.` : '') + (waiting ? ` Reading the rest would cost roughly $${(waiting * 0.015).toFixed(2)}.` : '')
+    : "No saved sales with a photo yet. Photos are noted as you browse eBay's Sold results with this version.";
+  chrome.storage.local.get(['anthropicKey', 'photoRun'], ({ anthropicKey, photoRun }) => {
+    $('api-key-status').textContent = anthropicKey ? `Key saved (ending ${anthropicKey.slice(-4)}). It is kept only in this browser.` : 'No key saved.';
+    const running = photoRun && photoRun.running;
+    $('photo-run').disabled = !anthropicKey || running || !(waiting || (failed && $('photo-retry').checked));
+    $('photo-stop').hidden = !running;
+    if (photoRun) {
+      $('photo-status').textContent = (running ? `Reading photos: ${photoRun.done} of ${photoRun.total}` : `Last run: read ${photoRun.done - photoRun.failed} of ${photoRun.total}`) +
+        (photoRun.failed ? `, ${photoRun.failed} failed` : '') + `, about $${(photoRun.cost || 0).toFixed(2)}.` + (photoRun.message ? ` ${photoRun.message}` : '');
+    }
+  });
+}
+$('api-key-save').addEventListener('click', () => {
+  const key = $('api-key').value.trim();
+  if (!/^sk-ant-/.test(key)) { $('api-key-status').textContent = 'That does not look like an Anthropic API key (they start with sk-ant-).'; return; }
+  chrome.storage.local.set({ anthropicKey: key }, () => { $('api-key').value = ''; renderSales(); });
+});
+$('api-key-clear').addEventListener('click', () => chrome.storage.local.remove('anthropicKey', renderSales));
+$('photo-retry').addEventListener('change', renderSales);
+$('photo-run').addEventListener('click', () => {
+  $('photo-run').disabled = true;
+  $('photo-status').textContent = 'Starting…';
+  chrome.runtime.sendMessage({ type: 'prk-photo-run', limit: +$('photo-limit').value || 5, retryFailed: $('photo-retry').checked }, (res) => {
+    if (!res || !res.ok) $('photo-status').textContent = 'Photos not read: ' + ((res && res.error) || 'no response') + '.';
+    renderSales();
+  });
+});
+$('photo-stop').addEventListener('click', () => chrome.runtime.sendMessage({ type: 'prk-photo-stop' }));
+
 chrome.storage.onChanged.addListener((changes) => {
-  if (changes.sales || changes.history || changes.mlbSnaps || changes.listDates) renderSales();
+  if (changes.sales || changes.history || changes.mlbSnaps || changes.listDates || changes.photoReads || changes.photoRun || changes.anthropicKey) renderSales();
 });
 renderSales();
 

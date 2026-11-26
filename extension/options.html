@@ -72,6 +72,26 @@
     </table>
   </div>
 
+  <h2>Read the photos</h2>
+  <p>Claude (Opus 5.5) reads each saved sale's main photo: the slab label (grading company, grade, autograph grade,
+     cert number) and the card (parallel colour, serial stamp, autograph). Where the photo is clear, its reading
+     replaces the title's in the CSV, and any disagreement is noted. It costs roughly one to two cents per photo,
+     billed to your Anthropic API account; each listing's photo is read once.</p>
+  <div class="row">
+    <input type="password" id="api-key" placeholder="Anthropic API key (sk-ant-...)" autocomplete="off" style="flex:1; min-width:240px">
+    <button id="api-key-save">Save key</button>
+    <button id="api-key-clear">Forget key</button>
+  </div>
+  <p class="muted" id="api-key-status"></p>
+  <p class="muted" id="photos-current"></p>
+  <div class="row">
+    <label>Read up to <input type="number" id="photo-limit" min="1" max="500" value="5" style="width:70px"> photos</label>
+    <label class="toggle"><input type="checkbox" id="photo-retry"> try failed ones again</label>
+    <button class="primary" id="photo-run" disabled>Read photos</button>
+    <button id="photo-stop" hidden>Stop</button>
+  </div>
+  <p class="muted" id="photo-status"></p>
+
   <h2>Ranks on the sale date</h2>
   <p>The CSV gives each sale the player's FanGraphs FV and ranks, and his MLB Pipeline ranks, from the lists that were
      current on the day it sold. A list counts from the date below. FanGraphs dates are estimates (a year's Report comes
@@ -98,6 +118,7 @@
   <script src="src/history.js"></script>
   <script src="src/asof.js"></script>
   <script src="src/cards.js"></script>
+  <script src="src/photos.js"></script>
   <script src="src/sales.js"></script>
   <script src="options.js"></script>
 </body>

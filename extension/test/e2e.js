@@ -63,6 +63,29 @@ const HISTORY = {
       contentType: 'text/html',
       body: fs.readFileSync(/LH_Sold=1/.test(route.request().url()) ? path.join(__dirname, 'fixture-sold.html') : FIXTURE, 'utf8'),
     }));
+    // Stand-ins for eBay's image server and the Anthropic API (photo reading).
+    const PHOTO = Buffer.from('fake-jpeg-bytes-for-the-test');
+    await ctx.route(/i\.ebayimg\.com/, (route) => route.fulfill({ contentType: 'image/jpeg', body: PHOTO }));
+    const apiCalls = [];
+    const READINGS = {
+      'Dario Vance Auto /99 PSA 10': { picture: 'one slabbed card', slabbed: true, grader: 'PSA', grade: '9', auto_grade: '10', cert_number: '81234567',
+        label_text: '2025 BOWMAN CHROME DARIO VANCE 1ST AUTO #/99', parallel_colour: null, serial_number: null, numbered_to: 99, autograph_visible: true, confidence: 'high', notes: 'Label reads PSA 9, title says PSA 10.' },
+      'Dual Auto': { picture: 'one card', slabbed: false, grader: null, grade: null, auto_grade: null, cert_number: null, label_text: null,
+        parallel_colour: 'gold', serial_number: '12/25', numbered_to: 25, autograph_visible: true, confidence: 'high', notes: '' },
+      'J.J. Okafor': { picture: 'one slabbed card', slabbed: true, grader: 'PSA', grade: '10', auto_grade: null, cert_number: null, label_text: null,
+        parallel_colour: null, serial_number: null, numbered_to: null, autograph_visible: false, confidence: 'low', notes: 'Photo is blurry.' },
+    };
+    await ctx.route(/api\.anthropic\.com/, (route) => {
+      const req = route.request();
+      const body = JSON.parse(req.postData());
+      apiCalls.push({ headers: req.headers(), body });
+      const text = body.messages[0].content[1].text;
+      const key = Object.keys(READINGS).find((k) => text.includes(k));
+      return route.fulfill({ contentType: 'application/json', body: JSON.stringify({
+        type: 'message', model: 'claude-opus-5-5', stop_reason: 'end_turn',
+        content: [{ type: 'thinking', thinking: '' }, { type: 'text', text: JSON.stringify(READINGS[key]) }],
+        usage: { input_tokens: 1700, output_tokens: 300 } }) });
+    });
     await ctx.route(/www\.mlb\.com/, (route) => {
       const slug = new URL(route.request().url()).pathname.split('/').filter(Boolean).pop();
       const file = MLB_DIR && path.join(MLB_DIR, slug + '.html');
@@ -208,10 +231,10 @@ const HISTORY = {
     await mgr.bringToFront();
     const [dl] = await Promise.all([mgr.waitForEvent('download'), mgr.click('#sales-download')]);
     const csv = fs.readFileSync(await dl.path(), 'utf8').split('\n');
-    assert.strictEqual(csv[0], 'sold_date,player,team,pos,price,currency,shipping,format,note,bids,year,product,first_bowman,auto,variant,numbered_to,serial,graded,grader,grade,auto_grade,noise,fg_list_at_sale,fg_fv_at_sale,fg_rank_at_sale,fg_org_rank_at_sale,mlb_list_at_sale,mlb_rank_at_sale,mlb_org_rank_at_sale,fg_fv_when_saved,fg_rank_when_saved,fg_org_rank_when_saved,mlb_rank_when_saved,mlb_org_rank_when_saved,title,url,item_id,saved_at');
+    assert.strictEqual(csv[0], 'sold_date,player,team,pos,price,currency,shipping,format,note,bids,year,product,first_bowman,auto,variant,numbered_to,serial,graded,grader,grade,auto_grade,noise,card_source,photo_mismatch,fg_list_at_sale,fg_fv_at_sale,fg_rank_at_sale,fg_org_rank_at_sale,mlb_list_at_sale,mlb_rank_at_sale,mlb_org_rank_at_sale,fg_fv_when_saved,fg_rank_when_saved,fg_org_rank_when_saved,mlb_rank_when_saved,mlb_org_rank_when_saved,photo_read,photo_picture,photo_slabbed,photo_grader,photo_grade,photo_auto_grade,photo_cert,photo_label,photo_parallel,photo_serial,photo_autograph,photo_confidence,photo_notes,title,url,image_url,item_id,saved_at');
     // Ranks on the sale date: FanGraphs 2025 Updated (counts from Aug 1, 2025); MLB from the list synced in this test,
     // read after the sale (the 2025 preseason list is too old to stand for a November 2026 sale).
-    assert.match(csv[1], /^2026-11-20,Dario Vance,PIT,SS,1234.56,\$,4.99,Auction,,12,2025,Bowman Chrome,yes,yes,Numbered,99,,yes,PSA,10,,,2025u,60,2,1,(\d{4}-\d{2}-\d{2} \(read after the sale\),1,1|,,),60,2,1,1,1,2025 Bowman Chrome 1st Dario Vance Auto \/99 PSA 10,https:\/\/www.ebay.com\/itm\/356000000001,356000000001,/);
+    assert.match(csv[1], /^2026-11-20,Dario Vance,PIT,SS,1234.56,\$,4.99,Auction,,12,2025,Bowman Chrome,yes,yes,Numbered,99,,yes,PSA,10,,,title,,2025u,60,2,1,(\d{4}-\d{2}-\d{2} \(read after the sale\),1,1|,,),60,2,1,1,1,no,,,,,,,,,,,,,2025 Bowman Chrome 1st Dario Vance Auto \/99 PSA 10,https:\/\/www.ebay.com\/itm\/356000000001,https:\/\/i\.ebayimg\.com\/images\/g\/aaa111\/s-l1600\.jpg,356000000001,/);
     assert.ok(csv.some((l) => /J\.J\. Okafor.*Best Offer,asking price; accepted offer not shown/.test(l)));
     assert.match(await mgr.locator('#dates-current').innerText(), /^FanGraphs: 6 lists\. MLB Pipeline: 2 lists \(2025-preseason to \d{4}-\d{2}-\d{2}\)\.$/);
     // Moving the 2025 Updated list's date past the sale puts the sale back on 2025 Report.
@@ -221,6 +244,57 @@ const HISTORY = {
     const [dl2] = await Promise.all([mgr.waitForEvent('download'), mgr.click('#sales-download')]);
     const row2 = fs.readFileSync(await dl2.path(), 'utf8').split('\n')[1];
     assert.match(row2, /,2025r,60,12,1,/, 'Dario Vance on 2025 Report: 60 FV, #12, club #1');
+
+    // Photo reading: the photo address was saved with each sale; with a key saved, Read photos reads each listing once.
+    assert.match(await mgr.locator('#photos-current').innerText(), /^3 saved sales have a photo: 0 read, 0 failed, 3 not read yet\./);
+    assert.ok(await mgr.locator('#photo-run').isDisabled(), 'no key yet');
+    await mgr.fill('#api-key', 'not-a-key');
+    await mgr.click('#api-key-save');
+    assert.match(await mgr.locator('#api-key-status').innerText(), /does not look like an Anthropic API key/);
+    await mgr.fill('#api-key', 'sk-ant-test-0000-abcd');
+    await mgr.click('#api-key-save');
+    await mgr.waitForFunction(() => /ending abcd/.test(document.getElementById('api-key-status').textContent));
+    await mgr.waitForFunction(() => !document.getElementById('photo-run').disabled);
+    await mgr.click('#photo-run');
+    await mgr.waitForFunction(() => /^Last run: read 3 of 3/.test(document.getElementById('photo-status').textContent));
+    assert.strictEqual(await mgr.locator('#photo-status').innerText(), 'Last run: read 3 of 3, about $0.04.');
+    assert.strictEqual(apiCalls.length, 3);
+    const call = apiCalls[0];
+    assert.strictEqual(call.headers['x-api-key'], 'sk-ant-test-0000-abcd');
+    assert.strictEqual(call.headers['anthropic-version'], '2026-10-21');
+    assert.strictEqual(call.headers['anthropic-dangerous-direct-browser-access'], 'true');
+    assert.strictEqual(call.body.model, 'claude-opus-5-5');
+    assert.strictEqual(call.body.output_config.format.type, 'json_schema');
+    assert.deepStrictEqual(call.body.messages[0].content[0].source, { type: 'base64', media_type: 'image/jpeg', data: PHOTO.toString('base64') });
+    const [dl3] = await Promise.all([mgr.waitForEvent('download'), mgr.click('#sales-download')]);
+    const lines3 = fs.readFileSync(await dl3.path(), 'utf8').trim().split('\n');
+    const head3 = lines3[0].split(',');
+    const rowsOf = (item) => lines3.slice(1).filter((l) => l.includes(`,${item},`));
+    const field = (line, name) => {
+      const cells = []; let cur = '', q = false;
+      for (let i = 0; i < line.length; i++) { const c = line[i];
+        if (q) { if (c === '"' && line[i + 1] === '"') { cur += '"'; i++; } else if (c === '"') q = false; else cur += c; }
+        else if (c === '"') q = true; else if (c === ',') { cells.push(cur); cur = ''; } else cur += c; }
+      cells.push(cur);
+      return cells[head3.indexOf(name)];
+    };
+    const pick = (line, names) => names.map((n) => field(line, n));
+    // The slab says PSA 9: the photo's grade replaces the title's, and the disagreement is noted.
+    assert.deepStrictEqual(pick(rowsOf('356000000001')[0], ['grader', 'grade', 'auto_grade', 'card_source', 'photo_mismatch', 'photo_cert', 'photo_read']),
+      ['PSA', '9', '10', 'title+photo', 'grade: title PSA 10, photo PSA 9', '81234567', 'yes']);
+    // The dual card: one reading, used for both players' rows (Gold /25, serial 12).
+    for (const line of rowsOf('356000000002')) {
+      assert.deepStrictEqual(pick(line, ['variant', 'numbered_to', 'serial', 'graded', 'card_source']), ['Gold', '25', '12', 'no', 'title+photo']);
+    }
+    // A low-confidence reading changes nothing but is noted.
+    assert.deepStrictEqual(pick(rowsOf('356000000003')[0], ['graded', 'grader', 'card_source', 'photo_confidence', 'photo_mismatch']),
+      ['no', '', 'title', 'low', 'grade: title says nothing, photo PSA 10']);
+    assert.match(field(rowsOf('356000000001')[0], 'image_url'), /^https:\/\/i\.ebayimg\.com\/images\/g\/aaa111\/s-l1600\.jpg$/);
+    assert.match(field(rowsOf('356000000002')[0], 'image_url'), /\/bbb222\/s-l1600\.webp$/, 'lazy image read from data-src');
+    // Nothing left to read; a second run would send no requests.
+    assert.match(await mgr.locator('#photos-current').innerText(), /3 read, 0 failed, 0 not read yet/);
+    assert.ok(await mgr.locator('#photo-run').isDisabled());
+    if (process.env.PRK_PHOTO_SHOT) { await mgr.locator('#photo-status').scrollIntoViewIfNeeded(); await mgr.screenshot({ path: process.env.PRK_PHOTO_SHOT }); }
     assert.strictEqual(csv.filter(Boolean).length, 5);
     // Saving can be switched off in the popup; nothing new is saved then.
     await mgr.goto(`chrome-extension://${id}/popup.html`);

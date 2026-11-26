@@ -121,7 +121,22 @@ for each ranked player on it.
     up to 90 days after it, marked "read after the sale". MLB's mid-season
     updates in past years were not kept, so a sale between July and December
     of a past year gets that year's preseason ranks.
-- Everything stays in the browser until you download it. To show it on the
+- **Photo reading (optional, paid).** Each saved sale also notes the address of
+  the listing's main photo. On the rankings page, under *Read the photos*,
+  save an Anthropic API key (kept only in this browser) and press **Read
+  photos**: Claude Opus 5.5 reads each listing's photo once (`src/photos.js`)
+  for the slab label (grading company, grade, autograph grade, cert number) and
+  the card (parallel colour, serial stamp, autograph). Where the photo shows one
+  card and the reading is high or medium confidence, its values replace the
+  title's in the CSV (`card_source` = `title+photo`); any disagreement goes in
+  `photo_mismatch`, and the raw reading in the `photo_*` columns. Start with a
+  few (the limit defaults to 5) and check them before reading the rest. It
+  costs roughly one to two cents a photo, shown before and after each run.
+  The photo is fetched at eBay's largest size from its image server, one per
+  listing you have already viewed; nothing else is fetched from eBay. A
+  request the API's safety checks decline is re-run on its recommended
+  fallback model (`fallbacks: "default"`).
+- Everything else stays in the browser until you download it. To show it on the
   Prospect Board dashboard, replace its *Sold prices* file in Sources with the
   CSV.
 

@@ -277,6 +277,7 @@
   <details id="pb-notes">
     <summary>How to read the lists</summary>
     <p>List names are a year plus a letter. <b>r</b> is that year's Report, the baseline list for the cycle. <b>u</b> is the Updated list, revised later for new performance, draft and trade movement, and graduations. FanGraphs revises one club at a time, so "on a current list" means the player is on the newest list his club appears in.</p>
+    <p>Where the extension read a sale's photo, the card's grade, numbering, parallel and autograph come from the photo (marked "photo ✓"); a ⚠ means the title and photo disagree, with details when you point at it.</p>
     <p>Each sale also carries the player's FanGraphs FV and ranks, and MLB Pipeline ranks, from the lists current on the day it sold. Point at them in a player's sales for which lists those were.</p>
     <p><b>Multipliers</b> compare like with like: the same player's same card (year, product, 1st Bowman, auto, parallel and numbering) sold raw and graded in the same quarter, or the same player's raw cards from one set sold in the same quarter for each numbering. Each comparison counts once, and the figure shown is the median. Cells from fewer than three comparisons are greyed. The FV tier is his FanGraphs FV on the sale date.</p>
     <p><b>Sold</b> and <b>Median sold</b> come from the sold eBay listings the Prospect Rank extension saved while you browsed eBay's Sold results. The median mixes every kind of card (base, refractors, autographs), and leaves out Best Offer sales, where eBay shows only the asking price. To update them, download the CSV from the extension's settings and replace the <i>Sold prices</i> file in Sources.</p>
@@ -1000,7 +1001,9 @@
       const k = Object.assign(document.createElement('td'), { className: 'pb-k' });
       k.textContent = [String(s.first_bowman) === 'yes' ? '1st' : '', String(s.auto) === 'yes' ? 'Auto' : '', cardLabel(s),
         isGraded(s) ? `${s.grader} ${s.grade}` : 'Raw'].filter(Boolean).join(' · ');
-      k.title = k.textContent;
+      if (s.card_source === 'title+photo') k.textContent += ' · photo ✓';
+      if (s.photo_mismatch) k.textContent += ' · ⚠';
+      k.title = k.textContent + (s.photo_mismatch ? `\nTitle and photo disagree: ${s.photo_mismatch}` : '') + (s.photo_cert ? `\nCert ${s.photo_grader} ${s.photo_cert}` : '');
       // His rankings on the day it sold (from the lists current then), as the extension exported them.
       const then = Object.assign(document.createElement('td'), { className: 'pb-k' });
       const mlbThen = num(s.mlb_rank_at_sale) != null ? `MLB #${num(s.mlb_rank_at_sale)}` : num(s.mlb_org_rank_at_sale) != null ? `MLB org #${num(s.mlb_org_rank_at_sale)}` : '';

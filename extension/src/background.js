@@ -1,5 +1,5 @@
 // Fetches MLB Pipeline rankings and the FanGraphs history files on request, and refreshes both weekly.
-importScripts('match.js', 'parse.js', 'history.js', 'asof.js', 'mlb.js');
+importScripts('match.js', 'parse.js', 'history.js', 'asof.js', 'mlb.js', 'photos.js');
 
 // Where the yearly FanGraphs files live: Rankings/ in this repository's default branch.
 const REPO = 'barter7/PropSpect';
@@ -94,10 +94,77 @@ chrome.runtime.onMessage.addListener((msg, sender, respond) => {
     job.then((r) => respond({ ok: true, ...r }), (err) => respond({ ok: false, error: err.message }));
     return true;
   }
+  if (msg.type === 'prk-photo-run') {
+    if (!photoRunning) photoRunning = runPhotos(Math.max(1, Math.min(500, +msg.limit || 5)), !!msg.retryFailed).finally(() => { photoRunning = null; });
+    photoRunning.then((r) => respond({ ok: true, ...r }), (err) => respond({ ok: false, error: err.message }));
+    return true;
+  }
+  if (msg.type === 'prk-photo-stop') { photoStop = true; respond({ ok: true }); return; }
   if (msg.type !== 'prk-sync') return;
   syncOnce().then((r) => respond({ ok: true, ...r }), (err) => respond({ ok: false, error: err.message }));
   return true; // answer asynchronously
 });
+
+// ---- Photo reading: one sold listing's main photo at a time, with the key the user saved. ----
+let photoStop = false;
+let photoRunning = null;
+
+function toBase64(bytes) {
+  let s = '';
+  for (let i = 0; i < bytes.length; i += 0x8000) s += String.fromCharCode.apply(null, bytes.subarray(i, i + 0x8000));
+  return btoa(s);
+}
+
+async function readOnePhoto(apiKey, item) {
+  const img = await fetch(item.image_url, { credentials: 'omit' });
+  if (!img.ok) throw new Error(`photo not available (HTTP ${img.status})`);
+  const type = (img.headers.get('content-type') || '').split(';')[0].trim();
+  if (!['image/jpeg', 'image/png', 'image/gif', 'image/webp'].includes(type)) throw new Error(`photo type ${type || 'unknown'} not supported`);
+  const data = toBase64(new Uint8Array(await img.arrayBuffer()));
+  const res = await fetch(ProspectPhotos.API, {
+    method: 'POST', headers: ProspectPhotos.HEADERS(apiKey), body: JSON.stringify(ProspectPhotos.buildRequest(item.title, data, type)),
+  });
+  const body = await res.json().catch(() => null);
+  if (res.status === 401 || res.status === 403) { const e = new Error('the API key was not accepted'); e.fatal = true; throw e; }
+  if (res.status === 429) { const e = new Error('rate limited; try again in a minute'); e.fatal = true; throw e; }
+  if (!res.ok) throw new Error((body && body.error && body.error.message) || `HTTP ${res.status}`);
+  return ProspectPhotos.parseResponse(body);
+}
+
+async function runPhotos(limit, retryFailed) {
+  const { sales, photoReads, anthropicKey } = await chrome.storage.local.get(['sales', 'photoReads', 'anthropicKey']);
+  if (!anthropicKey) throw new Error('add an Anthropic API key first');
+  const reads = photoReads || {};
+  // One reading per listing: a dual-player card's photo is read once.
+  const items = new Map();
+  for (const r of Object.values(sales || {})) {
+    if (!r.image_url || items.has(r.item_id)) continue;
+    const prev = reads[r.item_id];
+    if (prev && !(retryFailed && prev.error)) continue;
+    items.set(r.item_id, r);
+  }
+  const todo = [...items.values()].sort((a, b) => String(b.sold_date).localeCompare(String(a.sold_date))).slice(0, limit);
+  const run = { running: true, total: todo.length, done: 0, failed: 0, cost: 0, startedAt: Date.now(), message: '' };
+  await chrome.storage.local.set({ photoRun: run });
+  photoStop = false;
+  for (const item of todo) {
+    if (photoStop) { run.message = 'Stopped.'; break; }
+    try {
+      const got = await readOnePhoto(anthropicKey, item);
+      reads[item.item_id] = { reading: got.reading, model: got.model, cost: got.cost, at: new Date().toISOString(), url: item.image_url };
+      run.cost = Math.round((run.cost + got.cost) * 10000) / 10000;
+    } catch (err) {
+      run.failed++;
+      if (err.fatal) { run.message = `Stopped: ${err.message}.`; break; }
+      reads[item.item_id] = { error: err.message, at: new Date().toISOString(), url: item.image_url };
+    }
+    run.done++;
+    await chrome.storage.local.set({ photoReads: reads, photoRun: run });
+  }
+  run.running = false;
+  await chrome.storage.local.set({ photoReads: reads, photoRun: run });
+  return run;
+}
 
 chrome.runtime.onInstalled.addListener(() => chrome.alarms.create('prk-refresh', { periodInMinutes: 720 }));
 chrome.alarms.onAlarm.addListener(async (alarm) => {
