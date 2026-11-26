@@ -181,6 +181,13 @@ const HISTORY = {
     const sold = await ctx.newPage();
     await sold.goto('https://www.ebay.com/sch/i.html?_nkw=bowman+auto&LH_Sold=1&LH_Complete=1');
     await mgr.goto(`chrome-extension://${id}/options.html`);
+    // The page says when it is done.
+    await sold.waitForFunction(() => /✓ saved/.test((document.querySelector('.prk-toast') || {}).textContent || ''));
+    assert.strictEqual(await sold.locator('.prk-toast').innerText(), 'Prospect Rank: ✓ saved 3 sold listings from this page (4 new). Safe to move on.');
+    await sold.reload();
+    await sold.waitForFunction(() => /✓ saved/.test((document.querySelector('.prk-toast') || {}).textContent || ''));
+    assert.strictEqual(await sold.locator('.prk-toast').innerText(), 'Prospect Rank: ✓ saved 3 sold listings from this page (0 new). Safe to move on.');
+    if (process.argv[4]) await sold.screenshot({ path: process.argv[4] });
     await mgr.waitForFunction(() => /^4 sold listings saved for 3 players/.test(document.getElementById('sales-current').textContent));
     const saved = await mgr.evaluate(() => new Promise((ok) => chrome.storage.local.get('sales', (d) => ok(d.sales))));
     const brief = Object.values(saved).map((r) => [r.player, r.team, r.sold_date, r.price, r.format, r.bids, r.shipping, r.item_id, r.fg_fv, r.mlb_rank])

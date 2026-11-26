@@ -82,6 +82,12 @@ title and link, plus the player's MLB and FanGraphs ranks at that moment. A
 listing seen again is updated, not duplicated; a dual-player card is saved once
 for each ranked player on it.
 
+- No scrolling is needed: the whole results page is read once it loads, and
+  listings added later are picked up too. Each results page (page 2, 3, ...)
+  has to be opened; choosing 240 items per page cuts the number of pages.
+- A note in the bottom-right corner of a Sold page says when it is done:
+  "✓ saved N sold listings from this page (M new). Safe to move on." If no
+  ranked player's sold listing is on the page it says so instead.
 - Saving is on by default; switch it off with **Save sold prices** in the popup.
 - Hover a badge to see how many sales are saved for that player, the median
   and the latest price.

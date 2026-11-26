@@ -26,3 +26,12 @@
 .prk-card-line { color: #191919; }
 .prk-card .prk-chart { margin-top: 10px; padding-top: 10px; border-top: 1px solid #e6e6e6; }
 .prk-card-foot { margin-top: 8px; color: #666666; font-size: 11px; }
+.prk-toast {
+  position: fixed; right: 16px; bottom: 16px; z-index: 2147483647; max-width: 320px;
+  padding: 9px 12px; border-radius: 8px; cursor: pointer;
+  background: #ffffff; color: #191919; border: 1px solid #d8dee6; border-left: 4px solid #8a94a3;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.16); font: 600 13px/1.4 system-ui, -apple-system, "Segoe UI", sans-serif;
+}
+.prk-toast[data-state="busy"] { border-left-color: #b7791f; }
+.prk-toast[data-state="done"] { border-left-color: #2f855a; }
+.prk-toast[data-state="none"] { border-left-color: #8a94a3; font-weight: 500; }

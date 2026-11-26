@@ -122,6 +122,38 @@
     return sale ? { sale, id, url: link.href, page: 'search' } : null;
   }
 
+  // A small note in the corner of a Sold page that says what this tab has saved, so you know when it is done.
+  const isSoldPage = /[?&](LH_Sold|LH_Complete)=1/.test(location.search);
+  const pageKeys = new Set();
+  let pageNew = 0;
+  let toast = null;
+  let lookTimer = null;
+  function setToast(text, state) {
+    if (!toast) {
+      toast = document.createElement('div');
+      toast.className = 'prk-toast';
+      toast.setAttribute('role', 'status');
+      toast.title = 'Prospect Rank. Click to hide.';
+      toast.addEventListener('click', () => { toast.hidden = true; });
+      document.body.appendChild(toast);
+    }
+    toast.dataset.state = state;
+    toast.textContent = text;
+  }
+  function showLooking() {
+    if (!isSoldPage || !saveSales || !list || pageKeys.size) return;
+    setToast('Prospect Rank: reading sold listings…', 'busy');
+    clearTimeout(lookTimer);
+    lookTimer = setTimeout(() => {
+      if (!pageKeys.size && !pending.size) setToast('Prospect Rank: no sold listings of ranked players on this page.', 'none');
+    }, 2500);
+  }
+  function showSaved() {
+    const listings = new Set([...pageKeys].map((k) => k.split('|')[0])).size;
+    setToast(`Prospect Rank: ✓ saved ${listings} sold listing${listings === 1 ? '' : 's'} from this page` +
+      ` (${pageNew} new). Safe to move on.`, 'done');
+  }
+
   const pending = new Map();
   let flushTimer = null;
   function queueSales(el, title, players) {
@@ -133,6 +165,7 @@
       const r = ProspectSales.record(found.sale, { id: found.id, url: found.url, title, page: found.page }, p);
       pending.set(r.key, r);
     }
+    if (toast && toast.dataset.state !== 'done') setToast('Prospect Rank: saving sold listings…', 'busy');
     clearTimeout(flushTimer);
     flushTimer = setTimeout(flushSales, 800);
   }
@@ -144,10 +177,15 @@
       const all = sales || {};
       for (const r of batch) {
         const old = all[r.key];
+        if (!old && !pageKeys.has(r.key)) pageNew++;
+        pageKeys.add(r.key);
         // Keep when it was first saved; take the newer reading of everything else.
         all[r.key] = old ? Object.assign({}, old, r, { saved_at: old.saved_at }) : r;
       }
-      chrome.storage.local.set({ sales: all });
+      chrome.storage.local.set({ sales: all }, () => {
+        if (chrome.runtime.lastError) setToast('Prospect Rank: could not save sold listings (' + chrome.runtime.lastError.message + ').', 'none');
+        else showSaved();
+      });
     });
   }
 
@@ -190,10 +228,12 @@
       list = players.length ? players : null;
       enabled = data.enabled !== false;
       index = ProspectMatch.buildIndex(players);
+      if (!saveSales && toast) toast.hidden = true;
       const day = (l) => new Date(l.updatedAt).toLocaleDateString();
       updatedNote = [data.mlb && `MLB updated ${day(data.mlb)}`, data.fg && `FanGraphs ${data.fg.label || 'list'} loaded ${day(data.fg)}`]
         .filter(Boolean).join(', ');
       reset();
+      showLooking();
     });
   }
 
