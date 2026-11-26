@@ -99,7 +99,8 @@ for each ranked player on it.
   Bowman Chrome, Bowman Draft Chrome, Sapphire, Sterling, ...), **1st Bowman**,
   **autograph**, **parallel** (Refractor, Blue, Gold, Gold Shimmer, Blue Wave,
   Superfractor, ...), **numbering** (`/50`, and the serial when given, `23/50`),
-  grade (`PSA 10`, `BGS 9.5`), and whether it is a lot, break or sealed product
+  grading (graded or not; PSA, BGS, SGC, CGC, TAG; the grade, `Black Label`
+  and `Pristine`, and an autograph grade such as `BGS 9.5/10`), and whether it is a lot, break or sealed product
   rather than one card. These are columns in the CSV (`src/cards.js`). A
   parallel the title doesn't name but numbers shows as `Numbered`; one it
   neither names nor numbers shows as `Base`. Team names (Red Sox, Blue Jays)

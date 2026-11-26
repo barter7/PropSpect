@@ -208,10 +208,10 @@ const HISTORY = {
     await mgr.bringToFront();
     const [dl] = await Promise.all([mgr.waitForEvent('download'), mgr.click('#sales-download')]);
     const csv = fs.readFileSync(await dl.path(), 'utf8').split('\n');
-    assert.strictEqual(csv[0], 'sold_date,player,team,pos,price,currency,shipping,format,note,bids,year,product,first_bowman,auto,variant,numbered_to,serial,grader,grade,noise,fg_list_at_sale,fg_fv_at_sale,fg_rank_at_sale,fg_org_rank_at_sale,mlb_list_at_sale,mlb_rank_at_sale,mlb_org_rank_at_sale,fg_fv_when_saved,fg_rank_when_saved,fg_org_rank_when_saved,mlb_rank_when_saved,mlb_org_rank_when_saved,title,url,item_id,saved_at');
+    assert.strictEqual(csv[0], 'sold_date,player,team,pos,price,currency,shipping,format,note,bids,year,product,first_bowman,auto,variant,numbered_to,serial,graded,grader,grade,auto_grade,noise,fg_list_at_sale,fg_fv_at_sale,fg_rank_at_sale,fg_org_rank_at_sale,mlb_list_at_sale,mlb_rank_at_sale,mlb_org_rank_at_sale,fg_fv_when_saved,fg_rank_when_saved,fg_org_rank_when_saved,mlb_rank_when_saved,mlb_org_rank_when_saved,title,url,item_id,saved_at');
     // Ranks on the sale date: FanGraphs 2025 Updated (counts from Aug 1, 2025); MLB from the list synced in this test,
     // read after the sale (the 2025 preseason list is too old to stand for a November 2026 sale).
-    assert.match(csv[1], /^2026-11-20,Dario Vance,PIT,SS,1234.56,\$,4.99,Auction,,12,2025,Bowman Chrome,yes,yes,Numbered,99,,PSA,10,,2025u,60,2,1,(\d{4}-\d{2}-\d{2} \(read after the sale\),1,1|,,),60,2,1,1,1,2025 Bowman Chrome 1st Dario Vance Auto \/99 PSA 10,https:\/\/www.ebay.com\/itm\/356000000001,356000000001,/);
+    assert.match(csv[1], /^2026-11-20,Dario Vance,PIT,SS,1234.56,\$,4.99,Auction,,12,2025,Bowman Chrome,yes,yes,Numbered,99,,yes,PSA,10,,,2025u,60,2,1,(\d{4}-\d{2}-\d{2} \(read after the sale\),1,1|,,),60,2,1,1,1,2025 Bowman Chrome 1st Dario Vance Auto \/99 PSA 10,https:\/\/www.ebay.com\/itm\/356000000001,356000000001,/);
     assert.ok(csv.some((l) => /J\.J\. Okafor.*Best Offer,asking price; accepted offer not shown/.test(l)));
     assert.match(await mgr.locator('#dates-current').innerText(), /^FanGraphs: 6 lists\. MLB Pipeline: 2 lists \(2025-preseason to \d{4}-\d{2}-\d{2}\)\.$/);
     // Moving the 2025 Updated list's date past the sale puts the sale back on 2025 Report.

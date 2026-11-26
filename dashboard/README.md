@@ -24,3 +24,13 @@ autos, non-autos), parallel, numbering, grading, and leaves lots and breaks
 out unless asked. It charts the median price of each parallel for the players
 the top filters keep. The table's Sold columns and each player's sales list
 follow the same choices.
+
+**Price multipliers** compare like with like. *Graded vs raw*: the same
+player's same card (year, product, 1st Bowman, auto, parallel, numbering)
+sold raw and graded in the same quarter; each grade's median price divided by
+the raw median. *Parallels*: the same player's raw cards of one set sold in
+the same quarter; each numbering's median divided by the /499's (or the Base
+card's). Each comparison counts once and the figure is the median of them,
+shown for all players and by FanGraphs FV tier on the sale date, with a
+quarterly trend and each player's own figures in his history card. Lots,
+breaks and Best Offer sales are left out.

@@ -30,6 +30,17 @@
   const has = (t, word) => new RegExp(`(^|[^a-z])${word.replace(/[-/]/g, '[-/ ]?')}([^a-z]|$)`).test(t);
   const title = (s) => s.replace(/\b[a-z]/g, (c) => c.toUpperCase()).replace(/X-?fractor/i, 'X-Fractor');
 
+  // The grading company and grade: "PSA 10", "PSA GEM MT 10", "BGS 9.5/10" (card 9.5, autograph 10),
+  // "BGS Black Label 10", "SGC 9.5", "CGC Pristine 10", "TAG 9". Beckett is BGS (BVG is Beckett's vintage line).
+  const GRADERS = { psa: 'PSA', bgs: 'BGS', beckett: 'BGS', bvg: 'BGS', sgc: 'SGC', cgc: 'CGC', csg: 'CGC', tag: 'TAG', hga: 'HGA', isa: 'ISA', gma: 'GMA' };
+  function readGrade(t) {
+    const m = new RegExp('\\b(' + Object.keys(GRADERS).join('|') + ')\\s*(?:(?:gem\\s*(?:mint|mt)|gem|mint|mt|pristine|perfect|black\\s*label|pristine\\s*black\\s*label)\\s*)*' +
+      '(10|[1-9](?:\\.5)?)(?:\\s*\\/\\s*(10|[1-9](?:\\.5)?)|\\s*(?:auto|au|autograph)\\s*(10|[1-9](?:\\.5)?))?(?![0-9])').exec(t);
+    if (!m) return null;
+    const label = /black\s*label/.test(m[0]) ? ' Black Label' : /pristine/.test(m[0]) && m[1] !== 'psa' ? ' Pristine' : '';
+    return { text: m[0], grader: GRADERS[m[1]], grade: m[2] + label, autoGrade: m[3] || m[4] || '' };
+  }
+
   // Why a listing is not one card, or '' when it is.
   function noise(t) {
     if (/\b(lot|lots|bundle)\b|\bx\s?\d+\b|\b\d+\s?x\b|\(\d+\)\s*card|\b\d+\s*cards?\b/.test(t)) return 'lot';
@@ -44,6 +55,8 @@
     let t = norm(raw);
     // Take the player's name out so a surname such as "Green" or "Gold" is not read as a colour.
     for (const part of norm(playerName).split(' ').filter((w) => w.length > 2)) t = t.replace(new RegExp(`\\b${part}\\b`, 'g'), ' ');
+    const graded = readGrade(t);
+    if (graded) t = t.replace(graded.text, ' ');
     const year = (/\b(19[5-9]\d|20[0-4]\d)\b/.exec(t) || [])[1] || '';
     const words = t.replace(TEAMS, ' ');
     let product = '';
@@ -74,7 +87,6 @@
     if (/superfractor/i.test(variant)) variant = 'Superfractor';
     if (!variant) variant = numberedTo != null ? 'Numbered' : 'Base';
 
-    const grade = /\b(psa|bgs|sgc|cgc|csg|beckett|hga)\s*(10|[1-9](?:\.5)?)\b/.exec(t);
     return {
       year,
       product,
@@ -83,8 +95,10 @@
       variant,
       numbered_to: numberedTo,
       serial,
-      grader: grade ? (grade[1] === 'beckett' ? 'BGS' : grade[1].toUpperCase()) : '',
-      grade: grade ? grade[2] : '',
+      graded: !!graded,
+      grader: graded ? graded.grader : '',
+      grade: graded ? graded.grade : '',
+      auto_grade: graded ? graded.autoGrade : '',
       noise: noise(t),
     };
   }
@@ -92,7 +106,7 @@
   // "1st Bowman Auto · Gold /50 · PSA 10"
   function describeCard(c) {
     const kind = [c.first_bowman ? '1st Bowman' : '', c.auto ? 'Auto' : ''].filter(Boolean).join(' ') || 'Non-auto';
-    return [kind, c.variant + (c.numbered_to ? ` /${c.numbered_to}` : ''), c.grader ? `${c.grader} ${c.grade}` : 'Raw',
+    return [kind, c.variant + (c.numbered_to ? ` /${c.numbered_to}` : ''), c.grader ? `${c.grader} ${c.grade}${c.auto_grade ? ` (auto ${c.auto_grade})` : ''}` : 'Raw',
       c.noise ? `(${c.noise})` : ''].filter(Boolean).join(' · ');
   }
 

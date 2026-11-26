@@ -60,6 +60,23 @@
   .pb-variants .pb-val { fill: var(--color-fg); font-weight: var(--cds-font-weight-medium); }
   .pb-sales-groups { display: flex; flex-wrap: wrap; gap: 6px; margin: 2px 0 8px; }
   .pb-chip { font-size: var(--cds-font-size-caption); padding: 2px 8px; border: 1px solid var(--color-border-line); border-radius: 999px; font-variant-numeric: tabular-nums; }
+  .pb-h3 { font-size: var(--cds-font-size-body); font-weight: var(--cds-font-weight-medium); margin: 14px 0 6px; }
+  .pb-mult-controls { align-items: center; margin-top: 6px; }
+  .pb-mult-controls .pb-h3 { margin: 8px 0 0; }
+  .pb-sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+  .pb-matrix { overflow-x: auto; }
+  .pb-matrix table { border-collapse: separate; border-spacing: 2px; font-size: var(--cds-font-size-caption); font-variant-numeric: tabular-nums; }
+  .pb-matrix th { font-weight: var(--cds-font-weight-medium); color: var(--color-fg-muted); padding: 4px 8px; text-align: center; white-space: nowrap; }
+  .pb-matrix th:first-child { text-align: left; }
+  .pb-matrix td { padding: 5px 8px; text-align: center; border-radius: 4px; min-width: 56px; white-space: nowrap; }
+  .pb-matrix td:first-child { text-align: left; font-weight: var(--cds-font-weight-medium); }
+  .pb-matrix td b { font-size: var(--cds-font-size-body); font-weight: var(--cds-font-weight-medium); }
+  .pb-matrix td small { display: block; color: var(--color-fg-muted); font-size: 10.5px; }
+  .pb-matrix td.pb-thin { color: var(--color-fg-muted); }
+  .pb-trend { position: relative; min-height: 40px; }
+  .pb-trend svg { display: block; max-width: 100%; overflow: visible; }
+  .pb-trend text { font-family: var(--font-anthropic-sans); font-size: 11px; fill: var(--cds-text-secondary); font-variant-numeric: tabular-nums; }
+  .pb-trend .pb-val { fill: var(--color-fg); font-weight: var(--cds-font-weight-medium); }
   .pb-foot { display: flex; flex-wrap: wrap; gap: var(--cds-gap-sm); align-items: center; font-size: var(--cds-font-size-caption); color: var(--color-fg-muted); margin-top: 8px; }
   .pb-detail-name { font-size: var(--cds-font-size-heading); font-weight: var(--cds-font-weight-medium); }
   .pb-detail-bio { color: var(--color-fg-muted); font-size: var(--cds-font-size-caption); margin: 2px 0 10px; line-height: 1.5; }
@@ -194,6 +211,28 @@
     <div class="pb-variants" data-draw="variants" data-source="variant_prices"></div>
   </section>
 
+  <section class="pb-card" id="pb-mult">
+    <h2 class="pb-h2">Price multipliers</h2>
+    <p class="pb-note">How much more the same card sells for graded, and how much more a scarcer parallel sells for. Each comparison is one player's same card sold in the same quarter; the figure is the median across those comparisons, split by the player's FanGraphs FV when it sold. Follows the top filters and the Card choice above; lots, breaks and Best Offer sales are left out.</p>
+    <h3 class="pb-h3">Graded vs raw</h3>
+    <div class="pb-matrix" data-draw="grade-matrix" data-source="grade_multipliers"></div>
+    <div class="pb-controls pb-mult-controls">
+      <h3 class="pb-h3">Parallels vs</h3>
+      <label class="pb-field"><span class="pb-sr">Parallels compared with</span>
+        <select class="dash-select" id="pb-ref" data-param="ref">
+          <option value="">the /499 (Refractor)</option>
+          <option value="base">the Base card</option>
+        </select></label>
+    </div>
+    <div class="pb-matrix" data-draw="parallel-matrix" data-source="parallel_multipliers"></div>
+    <div class="pb-controls pb-mult-controls">
+      <h3 class="pb-h3">Trend by quarter</h3>
+      <label class="pb-field"><span class="pb-sr">Multiplier to chart</span>
+        <select class="dash-select" id="pb-trend" data-draw="trend-options" data-source="grade_multipliers parallel_multipliers"></select></label>
+    </div>
+    <div class="pb-trend" data-draw="trend" data-source="grade_multipliers parallel_multipliers"></div>
+  </section>
+
   <section id="pb-players">
     <h2 class="pb-h2">Players</h2>
     <div class="pb-controls pb-listbar">
@@ -239,6 +278,7 @@
     <summary>How to read the lists</summary>
     <p>List names are a year plus a letter. <b>r</b> is that year's Report, the baseline list for the cycle. <b>u</b> is the Updated list, revised later for new performance, draft and trade movement, and graduations. FanGraphs revises one club at a time, so "on a current list" means the player is on the newest list his club appears in.</p>
     <p>Each sale also carries the player's FanGraphs FV and ranks, and MLB Pipeline ranks, from the lists current on the day it sold. Point at them in a player's sales for which lists those were.</p>
+    <p><b>Multipliers</b> compare like with like: the same player's same card (year, product, 1st Bowman, auto, parallel and numbering) sold raw and graded in the same quarter, or the same player's raw cards from one set sold in the same quarter for each numbering. Each comparison counts once, and the figure shown is the median. Cells from fewer than three comparisons are greyed. The FV tier is his FanGraphs FV on the sale date.</p>
     <p><b>Sold</b> and <b>Median sold</b> come from the sold eBay listings the Prospect Rank extension saved while you browsed eBay's Sold results. The median mixes every kind of card (base, refractors, autographs), and leaves out Best Offer sales, where eBay shows only the asking price. To update them, download the CSV from the extension's settings and replace the <i>Sold prices</i> file in Sources.</p>
     <p>A Top 100 rank can run past 100 because FanGraphs ranks every player graded 50 FV or better. Players are followed from list to list by their FanGraphs player id, and by name and signing year when the id is missing or changed.</p>
   </details>
@@ -249,7 +289,7 @@
   const POS = {
     pit: /P$|^TWP$/i, c: /^C(\/|$)/i, inf: /^(1B|2B|3B|SS|INF|UTIL|4C)/i, of: /^(LF|CF|RF|OF)/i,
   };
-  const DEFAULTS = { card: '', variant: '', num: '', graded: '', lots: '', list: '', status: 'Current', team: '', pos: '', fv: '', sign: '', year: '', q: '', sort: 'fv_value', dir: 'desc', sel: '', show: 100 };
+  const DEFAULTS = { ref: '', trend: 'PSA 10', card: '', variant: '', num: '', graded: '', lots: '', list: '', status: 'Current', team: '', pos: '', fv: '', sign: '', year: '', q: '', sort: 'fv_value', dir: 'desc', sel: '', show: 100 };
   const fold = (s) => String(s || '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase();
   const num = (v) => (v === '' || v == null || isNaN(+v) ? null : +v);
   const listOrder = (k) => +k.slice(0, 4) * 2 + (k.endsWith('u') ? 1 : 0);
@@ -442,6 +482,213 @@
         .sort((a, b) => (a.numbered_to == null ? -1 : 0) - (b.numbered_to == null ? -1 : 0) || (b.numbered_to || 0) - (a.numbered_to || 0) || a.parallel.localeCompare(b.parallel));
     },
   });
+  // ---- Price multipliers ----
+  const TIERS = ['60+', '55', '50', '45', '40 or lower', 'Not on FanGraphs'];
+  const tierOf = (fv) => {
+    const v = fvValue(String(fv || ''));
+    return v == null ? 'Not on FanGraphs' : v >= 60 ? '60+' : v >= 55 ? '55' : v >= 50 ? '50' : v >= 45 ? '45' : '40 or lower';
+  };
+  const quarterOf = (d) => (/^\d{4}-\d{2}/.test(d || '') ? `${d.slice(0, 4)} Q${Math.floor((+d.slice(5, 7) - 1) / 3) + 1}` : '');
+  const isGraded = (s) => !!s.grader && String(s.graded) !== 'no';
+  // Priced single-card sales of the players the top filters keep, of the chosen card type.
+  function usableSales(players, sales, p) {
+    const keep = new Set(filtered(players, { nosort: true, list: '' }).map((r) => r.key));
+    const loose = Object.assign({}, p, { variant: '', num: '', graded: '', lots: '' });
+    const out = [];
+    for (const [key, list] of salesFor(players, sales)) {
+      if (!keep.has(key)) continue;
+      for (const s of list) {
+        if (s.noise || s.format === 'Best Offer' || num(s.price) == null || !quarterOf(s.sold_date)) continue;
+        if (cardOk(s, loose)) out.push({ key, s });
+      }
+    }
+    return out;
+  }
+  // From comparisons {key, bucket, ratio, n, tier, q}: the median ratio overall, by FV tier, by quarter and by player.
+  function summarizeRatios(obs) {
+    const rows = [];
+    const add = (segment, list) => {
+      for (const [bucket, v] of d3.group(list, (o) => o.bucket)) {
+        rows.push({ segment, bucket, multiplier: Math.round(median(v.map((o) => o.ratio)) * 100) / 100, cards: v.length, sales: d3.sum(v, (o) => o.n) });
+      }
+    };
+    add('All', obs);
+    for (const [t, v] of d3.group(obs, (o) => o.tier)) add(`tier:${t}`, v);
+    for (const [q, v] of d3.group(obs, (o) => o.q)) add(`quarter:${q}`, v);
+    for (const [k, v] of d3.group(obs, (o) => o.key)) add(`player:${k}`, v);
+    return rows;
+  }
+  const latestFv = (list) => list.slice().sort((a, b) => String(b.sold_date).localeCompare(String(a.sold_date)))[0].fg_fv_at_sale;
+  const gradeBucket = (s) => `${s.grader} ${s.grade}`;
+  const GRADER_ORDER = ['PSA', 'BGS', 'SGC', 'CGC', 'TAG'];
+  function bucketOrder(b) {
+    const g = /^([A-Z]+) (\d+(?:\.5)?)/.exec(b);
+    if (g) return (GRADER_ORDER.includes(g[1]) ? GRADER_ORDER.indexOf(g[1]) : 9) * 100 - +g[2] * 2 - (/Black Label|Pristine/.test(b) ? 1 : 0);
+    if (b === 'Base') return -2000;
+    if (b === '1/1') return 9999;
+    const n = /^\/(\d+)$/.exec(b);
+    return n ? 5000 - +n[1] : -1000; // unnumbered parallels after Base, numbered from /499 down
+  }
+
+  dash.calc('grade_multipliers', {
+    title: 'Graded vs raw multipliers',
+    description: "For each player's same card (year, product, 1st Bowman, auto, parallel, numbering) sold in the same quarter: median price at each grade divided by the median raw price. Summarized as the median of those ratios, overall, by FanGraphs FV tier at the sale, by quarter and by player. Lots, breaks and Best Offer sales are left out.",
+    inputs: ['players', 'sales'],
+    fn: (players, sales) => {
+      const groups = new Map();
+      for (const { key, s } of usableSales(players, sales, P())) {
+        const id = [key, s.year, s.product, s.first_bowman, s.auto, s.variant, s.numbered_to, quarterOf(s.sold_date)].join('|');
+        if (!groups.has(id)) groups.set(id, { key, q: quarterOf(s.sold_date), all: [], raw: [], graded: new Map() });
+        const g = groups.get(id);
+        g.all.push(s);
+        if (isGraded(s)) { const b = gradeBucket(s); if (!g.graded.has(b)) g.graded.set(b, []); g.graded.get(b).push(+s.price); }
+        else g.raw.push(+s.price);
+      }
+      const obs = [];
+      for (const g of groups.values()) {
+        if (!g.raw.length) continue;
+        const raw = median(g.raw), tier = tierOf(latestFv(g.all));
+        for (const [bucket, ps] of g.graded) obs.push({ key: g.key, q: g.q, tier, bucket, ratio: median(ps) / raw, n: ps.length + g.raw.length });
+      }
+      return summarizeRatios(obs);
+    },
+  });
+  dash.calc('parallel_multipliers', {
+    title: 'Parallel multipliers',
+    description: "For each player's raw cards of one set (year, product, 1st Bowman, auto) sold in the same quarter: median price of each numbering divided by the median price of the reference card (the /499, or the Base card). Summarized as the median of those ratios, overall, by FanGraphs FV tier at the sale, by quarter and by player. Graded cards, lots, breaks and Best Offer sales are left out.",
+    inputs: ['players', 'sales'],
+    fn: (players, sales) => {
+      const p = P(), ref = p.ref === 'base' ? 'Base' : '/499';
+      const groups = new Map();
+      for (const { key, s } of usableSales(players, sales, p)) {
+        if (isGraded(s)) continue;
+        const id = [key, s.year, s.product, s.first_bowman, s.auto, quarterOf(s.sold_date)].join('|');
+        if (!groups.has(id)) groups.set(id, { key, q: quarterOf(s.sold_date), all: [], by: new Map() });
+        const g = groups.get(id), n = num(s.numbered_to);
+        const bucket = n != null ? (n === 1 ? '1/1' : `/${n}`) : (s.variant || 'Base');
+        g.all.push(s);
+        if (!g.by.has(bucket)) g.by.set(bucket, []);
+        g.by.get(bucket).push(+s.price);
+      }
+      const obs = [];
+      for (const g of groups.values()) {
+        if (!g.by.has(ref)) continue;
+        const base = median(g.by.get(ref)), tier = tierOf(latestFv(g.all));
+        for (const [bucket, ps] of g.by) if (bucket !== ref) obs.push({ key: g.key, q: g.q, tier, bucket, ratio: median(ps) / base, n: ps.length + g.by.get(ref).length });
+      }
+      return summarizeRatios(obs);
+    },
+  });
+
+  // A table: one row per grade or parallel, one column per FV tier, each cell the median multiplier.
+  function matrix(name, source, what) {
+    dash.draw(name, (box) => {
+      const s = dash.data(source);
+      const say = (t) => box.replaceChildren(Object.assign(document.createElement('p'), { className: 'pb-msg', textContent: t }));
+      if (s.status === 'loading') return say('Working out multipliers…');
+      if (s.status !== 'ok') return say('The multipliers could not be worked out.');
+      const rows = s.data.filter((r) => r.segment === 'All' || r.segment.startsWith('tier:'));
+      if (!rows.length) {
+        const src = dash.data('sales');
+        return say(src.status === 'ok' && !src.data.length ? 'No sold prices saved yet.'
+          : `Not enough matching sales yet: each multiplier needs the same card sold ${what} in the same quarter.`);
+      }
+      const cols = ['All', ...TIERS.filter((t) => rows.some((r) => r.segment === `tier:${t}`))];
+      const buckets = [...new Set(rows.map((r) => r.bucket))].sort((a, b) => bucketOrder(a) - bucketOrder(b));
+      const at = new Map(rows.map((r) => [`${r.segment}|${r.bucket}`, r]));
+      const table = document.createElement('table');
+      const head = document.createElement('tr');
+      head.appendChild(document.createElement('th'));
+      for (const c of cols) head.appendChild(Object.assign(document.createElement('th'), { textContent: c === 'All' ? 'All players' : /^\d/.test(c) ? `FV ${c}` : c }));
+      table.appendChild(head);
+      const shade = (m) => `color-mix(in srgb, ${dash.colors[0]} ${Math.round(Math.min(55, 6 + Math.log2(Math.max(1, m)) * 14))}%, transparent)`;
+      for (const b of buckets) {
+        const tr = document.createElement('tr');
+        tr.appendChild(Object.assign(document.createElement('td'), { textContent: b }));
+        for (const c of cols) {
+          const r = at.get(`${c === 'All' ? 'All' : 'tier:' + c}|${b}`);
+          const td = document.createElement('td');
+          if (r) {
+            td.append(Object.assign(document.createElement('b'), { textContent: `${r.multiplier.toFixed(r.multiplier < 10 ? 1 : 0)}×` }),
+              Object.assign(document.createElement('small'), { textContent: `${r.cards} card${r.cards === 1 ? '' : 's'}` }));
+            td.style.background = shade(r.multiplier);
+            if (r.cards < 3) td.classList.add('pb-thin');
+            td.title = `${b}: ${r.multiplier.toFixed(2)}× ${what === 'raw and graded' ? 'the raw price' : 'the reference card'}, median of ${r.cards} card comparison${r.cards === 1 ? '' : 's'} (${r.sales} sales)` +
+              (c === 'All' ? '' : `, FV ${c} at the sale`) + (r.cards < 3 ? '. Few comparisons, so treat with care.' : '');
+          } else td.textContent = '';
+          tr.appendChild(td);
+        }
+        table.appendChild(tr);
+      }
+      box.replaceChildren(table);
+    });
+  }
+  matrix('grade-matrix', 'grade_multipliers', 'raw and graded');
+  matrix('parallel-matrix', 'parallel_multipliers', 'as the reference card and as the parallel');
+
+  // The multiplier to chart over time: any grade or parallel that has comparisons.
+  dash.draw('trend-options', (sel) => {
+    const opts = [];
+    for (const [src, label] of [['grade_multipliers', 'Graded'], ['parallel_multipliers', 'Parallel']]) {
+      const s = dash.data(src);
+      if (s.status !== 'ok') continue;
+      const bs = [...new Set(s.data.filter((r) => r.segment === 'All').map((r) => r.bucket))].sort((a, b) => bucketOrder(a) - bucketOrder(b));
+      for (const b of bs) opts.push(new Option(`${label}: ${b}`, b));
+    }
+    const want = P().trend || 'PSA 10';
+    if (!opts.some((o) => o.value === want)) opts.unshift(new Option(`Graded: ${want}`, want));
+    sel.replaceChildren(...opts);
+    sel.value = want;
+    sel.onchange = () => dash.setParams({ trend: sel.value || null });
+  });
+  dash.draw('trend', (box) => {
+    const say = (t) => box.replaceChildren(Object.assign(document.createElement('p'), { className: 'pb-msg', textContent: t }));
+    const want = P().trend || 'PSA 10';
+    const rows = [];
+    for (const src of ['grade_multipliers', 'parallel_multipliers']) {
+      const s = dash.data(src);
+      if (s.status === 'loading') return say('Working out multipliers…');
+      if (s.status === 'ok') rows.push(...s.data.filter((r) => r.bucket === want && r.segment.startsWith('quarter:')));
+    }
+    const data = rows.map((r) => ({ q: r.segment.slice(8), m: r.multiplier, cards: r.cards })).sort((a, b) => a.q.localeCompare(b.q));
+    if (data.length < 2) return say(data.length ? `Only one quarter (${data[0].q}: ${data[0].m.toFixed(1)}×) so far; a trend needs two.` : `No ${want} comparisons yet.`);
+    const W = Math.max(280, box.clientWidth), H = 170, m = { t: 22, r: 24, b: 26, l: 40 };
+    // Every quarter from the first to the last, so the time axis is to scale even where a quarter has no sales.
+    const qs = [];
+    for (let y0 = +data[0].q.slice(0, 4), k = +data[0].q.slice(-1); ; ) {
+      const q = `${y0} Q${k}`;
+      qs.push(q);
+      if (q === data[data.length - 1].q || qs.length > 200) break;
+      if (++k > 4) { k = 1; y0++; }
+    }
+    const x = d3.scalePoint().domain(qs).range([m.l, W - m.r]).padding(0.3);
+    const y = d3.scaleLinear().domain([0, d3.max(data, (d) => d.m) * 1.15]).nice().range([H - m.b, m.t]);
+    const svg = d3.create('svg').attr('width', W).attr('height', H).attr('role', 'img')
+      .attr('aria-label', `${want} multiplier by quarter: ` + data.map((d) => `${d.q} ${d.m.toFixed(1)}×`).join(', '));
+    svg.append('g').selectAll('line').data(y.ticks(4)).join('line').attr('x1', m.l).attr('x2', W - m.r).attr('y1', y).attr('y2', y).style('stroke', 'var(--cds-chart-grid)');
+    svg.append('g').selectAll('text').data(y.ticks(4)).join('text').attr('x', m.l - 6).attr('y', (v) => y(v) + 4).attr('text-anchor', 'end').text((v) => `${v}×`);
+    const every = Math.ceil(qs.length / Math.max(1, Math.floor((W - m.l - m.r) / 64)));
+    svg.append('g').selectAll('text').data(qs.filter((q, i) => i % every === 0 || i === qs.length - 1)).join('text')
+      .attr('x', (q) => x(q)).attr('y', H - 8).attr('text-anchor', 'middle').text((q) => q);
+    svg.append('path').attr('d', d3.line().x((d) => x(d.q)).y((d) => y(d.m))(data)).style('fill', 'none').style('stroke', dash.colors[0]).style('stroke-width', 2);
+    const tip = d3.create('div').attr('class', 'pb-tip').property('hidden', true);
+    svg.append('g').selectAll('circle').data(data).join('circle').attr('cx', (d) => x(d.q)).attr('cy', (d) => y(d.m)).attr('r', 4)
+      .style('fill', dash.colors[0]).style('stroke', 'var(--color-panel)').style('stroke-width', 2);
+    const last = data[data.length - 1], first = data[0];
+    for (const d of [first, last]) svg.append('text').attr('class', 'pb-val').attr('x', x(d.q)).attr('y', y(d.m) - 9).attr('text-anchor', 'middle').text(`${d.m.toFixed(1)}×`);
+    svg.append('g').selectAll('rect').data(data).join('rect').attr('x', (d) => x(d.q) - x.step() / 2).attr('width', x.step()).attr('y', 0).attr('height', H)
+      .style('fill', 'transparent')
+      .on('pointerenter', (event, d) => {
+        const t = tip.node();
+        t.hidden = false;
+        t.textContent = `${d.q}: ${want} ${d.m.toFixed(2)}× (${d.cards} card comparison${d.cards === 1 ? '' : 's'})`;
+        t.style.left = Math.min(Math.max(0, x(d.q) - t.offsetWidth / 2), W - t.offsetWidth) + 'px';
+        t.style.top = Math.max(0, y(d.m) - 34) + 'px';
+      })
+      .on('pointerleave', () => { tip.node().hidden = true; });
+    box.replaceChildren(svg.node(), tip.node());
+  });
+
   dash.calc('tiers', {
     title: 'Players by Future Value grade',
     description: 'How many of the players the filters keep sit at each Future Value grade.',
@@ -500,6 +747,7 @@
     }));
   });
 
+  document.querySelectorAll('#pb-ref').forEach((sel) => sel.addEventListener('change', () => dash.setParams({ ref: sel.value || null })));
   // Card choices for sold prices.
   document.querySelectorAll('#pb-cardfilters select[data-param]').forEach((sel) => {
     sel.addEventListener('change', () => dash.setParams({ [sel.dataset.param]: sel.value || null }));
@@ -607,6 +855,7 @@
     document.querySelectorAll('#pb-filters select[data-param]').forEach((sel) => {
       if (document.activeElement !== sel && !sel.dataset.draw) sel.value = p[sel.dataset.param] || '';
     });
+    document.querySelectorAll('#pb-ref').forEach((sel) => { if (document.activeElement !== sel) sel.value = p.ref || ''; });
     document.querySelectorAll('#pb-cardfilters select[data-param]').forEach((sel) => {
       if (document.activeElement !== sel) sel.value = p[sel.dataset.param] || '';
     });
@@ -750,7 +999,7 @@
       t.title = s.title || '';
       const k = Object.assign(document.createElement('td'), { className: 'pb-k' });
       k.textContent = [String(s.first_bowman) === 'yes' ? '1st' : '', String(s.auto) === 'yes' ? 'Auto' : '', cardLabel(s),
-        s.grader ? `${s.grader} ${s.grade}` : ''].filter(Boolean).join(' · ');
+        isGraded(s) ? `${s.grader} ${s.grade}` : 'Raw'].filter(Boolean).join(' · ');
       k.title = k.textContent;
       // His rankings on the day it sold (from the lists current then), as the extension exported them.
       const then = Object.assign(document.createElement('td'), { className: 'pb-k' });
@@ -761,6 +1010,19 @@
       table.appendChild(tr);
     }
     wrap.insertBefore(chips, null);
+    const own = [];
+    for (const src of ['grade_multipliers', 'parallel_multipliers']) {
+      const ms = dash.data(src);
+      if (ms.status !== 'ok') continue;
+      const tier = tierOf(r.fv);
+      for (const row of ms.data.filter((x) => x.segment === `player:${r.key}`).sort((a, b) => bucketOrder(a.bucket) - bucketOrder(b.bucket))) {
+        const peer = ms.data.find((x) => x.segment === `tier:${tier}` && x.bucket === row.bucket);
+        own.push(`${row.bucket} ${row.multiplier.toFixed(1)}×` + (peer && peer.cards > row.cards ? ` (FV ${tier}: ${peer.multiplier.toFixed(1)}×)` : ''));
+      }
+    }
+    if (own.length) {
+      wrap.appendChild(Object.assign(document.createElement('div'), { className: 'pb-sales-sum', textContent: 'His multipliers: ' + own.join(' · ') }));
+    }
     wrap.appendChild(table);
     if (list.length > 8) wrap.appendChild(Object.assign(document.createElement('div'), { className: 'pb-sales-sum', textContent: `Showing the 8 most recent of ${list.length}.` }));
     return wrap;

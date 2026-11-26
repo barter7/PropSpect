@@ -113,7 +113,7 @@
   // The player's rankings on the sale date (src/asof.js), filled in when exporting.
   const AT_SALE_COLUMNS = ['fg_list_at_sale', 'fg_fv_at_sale', 'fg_rank_at_sale', 'fg_org_rank_at_sale',
     'mlb_list_at_sale', 'mlb_rank_at_sale', 'mlb_org_rank_at_sale'];
-  const CARD_COLUMNS = ['year', 'product', 'first_bowman', 'auto', 'variant', 'numbered_to', 'serial', 'grader', 'grade', 'noise'];
+  const CARD_COLUMNS = ['year', 'product', 'first_bowman', 'auto', 'variant', 'numbered_to', 'serial', 'graded', 'grader', 'grade', 'auto_grade', 'noise'];
   const COLUMNS = ['sold_date', 'player', 'team', 'pos', 'price', 'currency', 'shipping', 'format', 'note', 'bids',
     ...CARD_COLUMNS, ...AT_SALE_COLUMNS, 'fg_fv_when_saved', 'fg_rank_when_saved', 'fg_org_rank_when_saved', 'mlb_rank_when_saved',
     'mlb_org_rank_when_saved', 'title', 'url', 'item_id', 'saved_at'];
@@ -121,7 +121,7 @@
   // The card fields, read from the title now rather than when saved, so a better reading reaches old rows too.
   function withCard(r) {
     const c = Cards.parseTitle(r.title, r.player);
-    return Object.assign({}, r, c, { first_bowman: c.first_bowman ? 'yes' : 'no', auto: c.auto ? 'yes' : 'no',
+    return Object.assign({}, r, c, { first_bowman: c.first_bowman ? 'yes' : 'no', auto: c.auto ? 'yes' : 'no', graded: c.graded ? 'yes' : 'no',
       // The ranks shown when the listing was saved, which may be after the sale.
       fg_fv_when_saved: r.fg_fv, fg_rank_when_saved: r.fg_rank, fg_org_rank_when_saved: r.fg_org_rank,
       mlb_rank_when_saved: r.mlb_rank, mlb_org_rank_when_saved: r.mlb_org_rank });

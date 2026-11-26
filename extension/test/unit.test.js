@@ -276,3 +276,18 @@ test('finds the rankings current on a sale date', () => {
   assert.deepStrictEqual(row, { fg_list_at_sale: '2025u', fg_fv_at_sale: '55', fg_rank_at_sale: 12, fg_org_rank_at_sale: 1,
     mlb_list_at_sale: '2025-preseason', mlb_rank_at_sale: 30, mlb_org_rank_at_sale: 1 });
 });
+
+test('reads the grading company, grade and autograph grade', () => {
+  const g = (title) => { const c = Cards.parseTitle(title, 'X Y'); return [c.graded, c.grader, c.grade, c.auto_grade, c.numbered_to]; };
+  assert.deepStrictEqual(g('2024 Bowman Chrome 1st Auto Gold /50 PSA 10'), [true, 'PSA', '10', '', 50]);
+  assert.deepStrictEqual(g('2024 Bowman Chrome 1st Auto PSA GEM MT 10 /99'), [true, 'PSA', '10', '', 99]);
+  assert.deepStrictEqual(g('2024 Bowman Chrome 1st Auto BGS 9.5/10 Blue /150'), [true, 'BGS', '9.5', '10', 150], 'card 9.5, autograph 10');
+  assert.deepStrictEqual(g('2024 Bowman Chrome 1st Auto BGS 9 Auto 10'), [true, 'BGS', '9', '10', null]);
+  assert.deepStrictEqual(g('2024 Bowman Chrome 1st Refractor TAG 9 /499'), [true, 'TAG', '9', '', 499]);
+  assert.deepStrictEqual(g('2024 Bowman Chrome 1st CGC Pristine 10'), [true, 'CGC', '10 Pristine', '', null]);
+  assert.deepStrictEqual(g('2024 Bowman Chrome 1st Auto BGS Black Label 10 /25'), [true, 'BGS', '10 Black Label', '', 25]);
+  assert.deepStrictEqual(g('2024 Bowman Chrome 1st Auto Beckett 9.5'), [true, 'BGS', '9.5', '', null]);
+  assert.deepStrictEqual(g('PSA10 2024 Bowman Chrome 1st'), [true, 'PSA', '10', '', null]);
+  assert.deepStrictEqual(g('2024 Bowman Chrome 1st Auto SGC 9.5 /99'), [true, 'SGC', '9.5', '', 99]);
+  assert.deepStrictEqual(g('2024 Bowman Chrome 1st Auto Raw /499'), [false, '', '', '', 499]);
+});
