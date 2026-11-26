@@ -110,22 +110,31 @@
     };
   }
 
+  // The player's rankings on the sale date (src/asof.js), filled in when exporting.
+  const AT_SALE_COLUMNS = ['fg_list_at_sale', 'fg_fv_at_sale', 'fg_rank_at_sale', 'fg_org_rank_at_sale',
+    'mlb_list_at_sale', 'mlb_rank_at_sale', 'mlb_org_rank_at_sale'];
   const CARD_COLUMNS = ['year', 'product', 'first_bowman', 'auto', 'variant', 'numbered_to', 'serial', 'grader', 'grade', 'noise'];
   const COLUMNS = ['sold_date', 'player', 'team', 'pos', 'price', 'currency', 'shipping', 'format', 'note', 'bids',
-    ...CARD_COLUMNS, 'mlb_rank', 'mlb_org_rank', 'fg_fv', 'fg_rank', 'fg_org_rank', 'title', 'url', 'item_id', 'saved_at'];
+    ...CARD_COLUMNS, ...AT_SALE_COLUMNS, 'fg_fv_when_saved', 'fg_rank_when_saved', 'fg_org_rank_when_saved', 'mlb_rank_when_saved',
+    'mlb_org_rank_when_saved', 'title', 'url', 'item_id', 'saved_at'];
 
   // The card fields, read from the title now rather than when saved, so a better reading reaches old rows too.
   function withCard(r) {
     const c = Cards.parseTitle(r.title, r.player);
-    return Object.assign({}, r, c, { first_bowman: c.first_bowman ? 'yes' : 'no', auto: c.auto ? 'yes' : 'no' });
+    return Object.assign({}, r, c, { first_bowman: c.first_bowman ? 'yes' : 'no', auto: c.auto ? 'yes' : 'no',
+      // The ranks shown when the listing was saved, which may be after the sale.
+      fg_fv_when_saved: r.fg_fv, fg_rank_when_saved: r.fg_rank, fg_org_rank_when_saved: r.fg_org_rank,
+      mlb_rank_when_saved: r.mlb_rank, mlb_org_rank_when_saved: r.mlb_org_rank });
   }
 
-  function toCsv(records) {
+  // ctx (optional): { history, mlbSnaps, overrides } for the rankings on each sale date.
+  function toCsv(records, ctx) {
+    const AsOf = root.ProspectAsOf || (typeof require !== 'undefined' ? require('./asof.js') : null);
     const cell = (v) => {
       const s = v == null ? '' : String(v);
       return /[",\n\r]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
     };
-    const rows = records.map(withCard).sort((a, b) => (b.sold_date || '').localeCompare(a.sold_date || '') || a.player.localeCompare(b.player));
+    const rows = records.map((r) => Object.assign(withCard(r), ctx ? AsOf.atSale(r, ctx) : {})).sort((a, b) => (b.sold_date || '').localeCompare(a.sold_date || '') || a.player.localeCompare(b.player));
     return [COLUMNS.join(','), ...rows.map((r) => COLUMNS.map((c) => cell(r[c])).join(','))].join('\n') + '\n';
   }
 
@@ -141,7 +150,7 @@
     return { count: records.length, priced: prices.length, median: mid, low: prices[0], high: prices[prices.length - 1], last };
   }
 
-  const api = { parseDate, parsePrice, parseCard, parseItemPage, itemId, record, toCsv, summarize, withCard, COLUMNS };
+  const api = { parseDate, parsePrice, parseCard, parseItemPage, itemId, record, toCsv, summarize, withCard, COLUMNS, AT_SALE_COLUMNS };
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
   else root.ProspectSales = api;
 })(typeof globalThis !== 'undefined' ? globalThis : this);

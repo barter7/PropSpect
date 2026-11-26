@@ -105,6 +105,21 @@ for each ranked player on it.
   neither names nor numbers shows as `Base`. Team names (Red Sox, Blue Jays)
   and the player's own name are ignored when looking for colours. The reading
   is done at export, so later fixes to it apply to sales already saved.
+- **Ranks on the sale date.** The CSV gives each sale the player's FanGraphs
+  FV, Top 100 and club rank, and his MLB Pipeline Top 100 and club rank, from
+  the lists current on the day it sold (`src/asof.js`), next to the ranks shown
+  when it was saved:
+  - FanGraphs: the latest yearly list in effect on that day. A year's Report
+    counts from January 1 and its Updated list from August 1 by default; edit
+    these on the rankings page under *Ranks on the sale date*. A list that is
+    still being rolled out counts only for the clubs it already has.
+  - MLB Pipeline: every sync keeps a dated copy of the lists, and past years'
+    preseason lists (2017-2025, counted from January 20) come from
+    `Rankings/mlb-pipeline/` with **Sync history from GitHub**. A sale uses the
+    latest list from before it, up to 400 days old; failing that, a list read
+    up to 90 days after it, marked "read after the sale". MLB's mid-season
+    updates in past years were not kept, so a sale between July and December
+    of a past year gets that year's preseason ranks.
 - Everything stays in the browser until you download it. To show it on the
   Prospect Board dashboard, replace its *Sold prices* file in Sources with the
   CSV.

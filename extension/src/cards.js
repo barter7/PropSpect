@@ -54,7 +54,8 @@
     const serialRe = /(^|[^0-9./])(?:#\s*)?(\d{1,4})?\s*\/\s*(\d{1,4})(?![0-9.]|\s*\/)/g;
     for (let m; (m = serialRe.exec(t));) {
       const of = +m[3], n = m[2] ? +m[2] : null;
-      if (!of || of > 2025 || (n != null && n > of)) continue;
+      if (!of || of > 5000 || (of >= 1900 && of <= 2099) || (n != null && n > of)) continue; // a year is not a serial
+      if (n == null && /\s\/\s/.test(m[0])) continue; // a slash between two names, not numbering
       numberedTo = of; serial = n; break;
     }
     if (numberedTo == null && /\bone of one\b|\b1 of 1\b/.test(t)) { numberedTo = 1; serial = 1; }

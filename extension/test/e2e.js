@@ -45,6 +45,7 @@ const HISTORY = {
   'Rankings/fangraphs/2025r.csv': HEAD + 'Dario Vance,PIT,SS,12,1,60,2021,sa1\nJ.J. Okafor,STL,2B,,6,45,2024,sa2\n',
   'Rankings/fangraphs/2025u.csv': HEAD + 'Dario Vance,PIT,SS,2,1,60,2021,9001\nJ.J. Okafor,STL,2B,,4,45+,2024,sa2\n',
   'Rankings/README.md': 'not a ranking file',
+  'Rankings/mlb-pipeline/2025-preseason.csv': 'rank,org_rank,name,team,pos\n4,1,Dario Vance,PIT,SS\n,6,J.J. Okafor,STL,2B\n',
   'Rankings/other/2025r.csv': HEAD + 'Wrong Source,BOS,C,1,1,80,2020,x\n',
 };
 
@@ -160,7 +161,7 @@ const HISTORY = {
     await mgr.click('#hist-sync');
     await mgr.waitForFunction(() => /^(Loaded|History not loaded)/.test(document.getElementById('hist-status').textContent));
     assert.strictEqual(await mgr.locator('#hist-status').innerText(),
-      'Loaded 6 lists (2023r, 2023u, 2024r, 2024u, 2025r, 2025u), 3 players.');
+      'Loaded 6 lists (2023r, 2023u, 2024r, 2024u, 2025r, 2025u), 3 players. Also 1 past MLB Pipeline list.');
     assert.match(await mgr.locator('#fg-current').innerText(), /^3 players .* from the history files, through 2025 Updated,/);
     await page.bringToFront();
     await page.waitForFunction(() => document.querySelector('.prk-badge').textContent === 'PIT SS · MLB #1 · FG 60 #2');
@@ -207,9 +208,19 @@ const HISTORY = {
     await mgr.bringToFront();
     const [dl] = await Promise.all([mgr.waitForEvent('download'), mgr.click('#sales-download')]);
     const csv = fs.readFileSync(await dl.path(), 'utf8').split('\n');
-    assert.strictEqual(csv[0], 'sold_date,player,team,pos,price,currency,shipping,format,note,bids,year,product,first_bowman,auto,variant,numbered_to,serial,grader,grade,noise,mlb_rank,mlb_org_rank,fg_fv,fg_rank,fg_org_rank,title,url,item_id,saved_at');
-    assert.match(csv[1], /^2026-11-20,Dario Vance,PIT,SS,1234.56,\$,4.99,Auction,,12,2025,Bowman Chrome,yes,yes,Numbered,99,,PSA,10,,1,1,60,2,1,2025 Bowman Chrome 1st Dario Vance Auto \/99 PSA 10,https:\/\/www.ebay.com\/itm\/356000000001,356000000001,/);
+    assert.strictEqual(csv[0], 'sold_date,player,team,pos,price,currency,shipping,format,note,bids,year,product,first_bowman,auto,variant,numbered_to,serial,grader,grade,noise,fg_list_at_sale,fg_fv_at_sale,fg_rank_at_sale,fg_org_rank_at_sale,mlb_list_at_sale,mlb_rank_at_sale,mlb_org_rank_at_sale,fg_fv_when_saved,fg_rank_when_saved,fg_org_rank_when_saved,mlb_rank_when_saved,mlb_org_rank_when_saved,title,url,item_id,saved_at');
+    // Ranks on the sale date: FanGraphs 2025 Updated (counts from Aug 1, 2025); MLB from the list synced in this test,
+    // read after the sale (the 2025 preseason list is too old to stand for a November 2026 sale).
+    assert.match(csv[1], /^2026-11-20,Dario Vance,PIT,SS,1234.56,\$,4.99,Auction,,12,2025,Bowman Chrome,yes,yes,Numbered,99,,PSA,10,,2025u,60,2,1,(\d{4}-\d{2}-\d{2} \(read after the sale\),1,1|,,),60,2,1,1,1,2025 Bowman Chrome 1st Dario Vance Auto \/99 PSA 10,https:\/\/www.ebay.com\/itm\/356000000001,356000000001,/);
     assert.ok(csv.some((l) => /J\.J\. Okafor.*Best Offer,asking price; accepted offer not shown/.test(l)));
+    assert.match(await mgr.locator('#dates-current').innerText(), /^FanGraphs: 6 lists\. MLB Pipeline: 2 lists \(2025-preseason to \d{4}-\d{2}-\d{2}\)\.$/);
+    // Moving the 2025 Updated list's date past the sale puts the sale back on 2025 Report.
+    await mgr.locator('#dates-rows input[aria-label="FanGraphs 2025 Updated counts from"]').fill('2026-12-01');
+    await mgr.locator('#dates-rows input[aria-label="FanGraphs 2025 Updated counts from"]').dispatchEvent('change');
+    await mgr.waitForFunction(() => /changed/.test(document.getElementById('dates-rows').innerText));
+    const [dl2] = await Promise.all([mgr.waitForEvent('download'), mgr.click('#sales-download')]);
+    const row2 = fs.readFileSync(await dl2.path(), 'utf8').split('\n')[1];
+    assert.match(row2, /,2025r,60,12,1,/, 'Dario Vance on 2025 Report: 60 FV, #12, club #1');
     assert.strictEqual(csv.filter(Boolean).length, 5);
     // Saving can be switched off in the popup; nothing new is saved then.
     await mgr.goto(`chrome-extension://${id}/popup.html`);
@@ -226,7 +237,7 @@ const HISTORY = {
     if (process.argv[3]) {
       await mgr.goto(`chrome-extension://${id}/options.html`);
       await mgr.setViewportSize({ width: 820, height: 1400 });
-      await mgr.locator('h2', { hasText: 'Sold prices' }).scrollIntoViewIfNeeded();
+      await mgr.locator('#sales-wrap').scrollIntoViewIfNeeded();
       await mgr.screenshot({ path: process.argv[3], fullPage: false });
     }
     console.log('e2e passed:', badges.join(' | '));

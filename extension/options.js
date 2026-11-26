@@ -100,7 +100,8 @@ $('sync').addEventListener('click', () => {
 function historyDone(res) {
   $('hist-sync').disabled = false;
   $('hist-status').textContent = res && res.ok
-    ? `Loaded ${res.snapshots.length} lists (${res.snapshots.join(', ')}), ${res.players} players.` +
+    ? (res.snapshots.length ? `Loaded ${res.snapshots.length} lists (${res.snapshots.join(', ')}), ${res.players} players.` : 'Loaded.') +
+      (res.mlbLists ? ` Also ${res.mlbLists} past MLB Pipeline list${res.mlbLists === 1 ? '' : 's'}.` : '') +
       (res.skipped.length ? ` Skipped (no year plus r/u in the name): ${res.skipped.join(', ')}.` : '')
     : 'History not loaded: ' + ((res && res.error) || 'no response') + '.';
   render();
@@ -121,8 +122,11 @@ $('hist-clear').addEventListener('click', () => chrome.storage.local.remove('his
 }));
 
 // Sold prices saved from eBay.
+let salesCtx = {};
 function renderSales() {
-  chrome.storage.local.get('sales', ({ sales }) => {
+  chrome.storage.local.get(['sales', 'history', 'mlbSnaps', 'listDates'], ({ sales, history, mlbSnaps, listDates }) => {
+    salesCtx = { history: history || null, mlbSnaps: mlbSnaps || null, overrides: listDates || {} };
+    renderDates(history, mlbSnaps, listDates || {});
     const all = Object.values(sales || {});
     const players = new Set(all.map((r) => r.player)).size;
     $('sales-current').textContent = all.length
@@ -136,7 +140,10 @@ function renderSales() {
     for (const r of recent) {
       const tr = document.createElement('tr');
       const price = `${r.currency || '$'}${r.price.toFixed(2)}`;
-      for (const v of [r.sold_date, `${r.player} (${r.team})`, price, ProspectCards.describeCard(ProspectCards.parseTitle(r.title, r.player)), r.format + (r.note ? ' *' : ''), r.fg_fv]) {
+      const then = ProspectAsOf.atSale(r, salesCtx);
+      const thenText = [then.fg_fv_at_sale ? `${then.fg_fv_at_sale} FV (${then.fg_list_at_sale})` : then.fg_list_at_sale ? `not on FG ${then.fg_list_at_sale}` : '',
+        then.mlb_rank_at_sale != null ? `MLB #${then.mlb_rank_at_sale}` : then.mlb_org_rank_at_sale != null ? `MLB org #${then.mlb_org_rank_at_sale}` : ''].filter(Boolean).join(' · ');
+      for (const v of [r.sold_date, `${r.player} (${r.team})`, price, ProspectCards.describeCard(ProspectCards.parseTitle(r.title, r.player)), r.format + (r.note ? ' *' : ''), thenText]) {
         const td = document.createElement('td');
         td.textContent = v == null ? '' : v;
         tr.appendChild(td);
@@ -154,8 +161,9 @@ function renderSales() {
   });
 }
 $('sales-download').addEventListener('click', () => {
-  chrome.storage.local.get('sales', ({ sales }) => {
-    const blob = new Blob([ProspectSales.toCsv(Object.values(sales || {}))], { type: 'text/csv' });
+  chrome.storage.local.get(['sales', 'history', 'mlbSnaps', 'listDates'], ({ sales, history, mlbSnaps, listDates }) => {
+    const ctx = { history: history || null, mlbSnaps: mlbSnaps || null, overrides: listDates || {} };
+    const blob = new Blob([ProspectSales.toCsv(Object.values(sales || {}), ctx)], { type: 'text/csv' });
     const a = document.createElement('a');
     a.href = URL.createObjectURL(blob);
     a.download = `prospect-sold-prices-${new Date().toISOString().slice(0, 10)}.csv`;
@@ -179,7 +187,53 @@ $('sales-clear').addEventListener('click', () => {
   $('sales-clear').textContent = 'Remove all';
   chrome.storage.local.remove('sales', () => { $('sales-status').textContent = 'All saved sales removed.'; });
 });
-chrome.storage.onChanged.addListener((changes) => { if (changes.sales) renderSales(); });
+// The date each list counts from, editable.
+function renderDates(history, mlbSnaps, overrides) {
+  const fgKeys = history ? history.snapshots.map((s) => s.key || `${s.year}${s.type}`) : [];
+  const mlbKeys = Object.keys(mlbSnaps || {}).sort();
+  $('dates-current').textContent = (fgKeys.length ? `FanGraphs: ${fgKeys.length} lists. ` : 'FanGraphs: no history loaded, so no FV on sale dates. ') +
+    (mlbKeys.length ? `MLB Pipeline: ${mlbKeys.length} lists (${mlbKeys[0]} to ${mlbKeys[mlbKeys.length - 1]}).`
+      : 'MLB Pipeline: no lists yet. Sync MLB Pipeline, and Sync history from GitHub for past years.');
+  $('dates-wrap').hidden = !(fgKeys.length || mlbKeys.length);
+  const body = $('dates-rows');
+  body.textContent = '';
+  const row = (key, label, editable) => {
+    const tr = document.createElement('tr');
+    const name = document.createElement('td');
+    name.textContent = label;
+    const cell = document.createElement('td');
+    const note = document.createElement('td');
+    note.className = 'muted';
+    if (editable) {
+      const input = document.createElement('input');
+      input.type = 'date';
+      input.value = ProspectAsOf.listDate(key, overrides);
+      input.setAttribute('aria-label', `${label} counts from`);
+      input.addEventListener('change', () => {
+        if (!input.value) return;
+        const next = Object.assign({}, overrides, { [key]: input.value });
+        if (input.value === ProspectAsOf.listDate(key)) delete next[key];
+        chrome.storage.local.set({ listDates: next });
+      });
+      cell.appendChild(input);
+      note.textContent = overrides[key] ? 'changed' : 'estimate';
+    } else {
+      cell.textContent = key;
+      note.textContent = 'read that day';
+    }
+    tr.append(name, cell, note);
+    body.appendChild(tr);
+  };
+  for (const k of fgKeys) row(k, `FanGraphs ${k.slice(0, 4)} ${k.endsWith('u') ? 'Updated' : 'Report'}`, true);
+  for (const k of mlbKeys) {
+    if (/preseason/.test(k)) row(k, `MLB Pipeline ${k.slice(0, 4)} preseason`, true);
+    else row(k, 'MLB Pipeline, as synced', false);
+  }
+}
+
+chrome.storage.onChanged.addListener((changes) => {
+  if (changes.sales || changes.history || changes.mlbSnaps || changes.listDates) renderSales();
+});
 renderSales();
 
 render();

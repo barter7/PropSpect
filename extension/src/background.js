@@ -1,5 +1,5 @@
 // Fetches MLB Pipeline rankings and the FanGraphs history files on request, and refreshes both weekly.
-importScripts('match.js', 'parse.js', 'history.js', 'mlb.js');
+importScripts('match.js', 'parse.js', 'history.js', 'asof.js', 'mlb.js');
 
 // Where the yearly FanGraphs files live: Rankings/ in this repository's default branch.
 const REPO = 'barter7/PropSpect';
@@ -15,7 +15,12 @@ async function sync() {
     return res.text();
   };
   const { players, errors } = await ProspectMLB.fetchRankings(fetchText);
-  await chrome.storage.local.set({ mlb: { updatedAt: Date.now(), players, errors } });
+  // Keep a dated copy of every sync, so a sale can be matched to the ranks of its own day.
+  const day = new Date().toLocaleDateString('en-CA'); // YYYY-MM-DD, local time
+  const { mlbSnaps } = await chrome.storage.local.get('mlbSnaps');
+  const snaps = mlbSnaps || {};
+  snaps[day] = { label: day, date: day, source: 'sync', players: players.map((p) => [p.name, p.team, p.rank ?? null, p.orgRank ?? null]) };
+  await chrome.storage.local.set({ mlb: { updatedAt: Date.now(), players, errors }, mlbSnaps: snaps });
   return { count: players.length, top100: players.filter((p) => p.rank != null).length, errors };
 }
 
@@ -32,6 +37,12 @@ async function syncHistory(auto) {
     .filter((p) => /^Rankings\/.+\.csv$/i.test(p) && !/^Rankings\/(mlb-pipeline|other)\//i.test(p) && ProspectHistory.parseFileName(p));
   if (!paths.length) throw new Error(`no <year>r.csv or <year>u.csv files found under Rankings/ on ${REPO}@${REF}`);
   const files = [];
+  // Past MLB Pipeline lists: Rankings/mlb-pipeline/<year>-preseason.csv and <YYYY-MM-DD>.csv.
+  for (const t of tree.tree || []) {
+    if (t.type !== 'blob' || !/^Rankings\/mlb-pipeline\/.+\.csv$/i.test(t.path) || !ProspectAsOf.mlbLabel(t.path)) continue;
+    const url = `https://raw.githubusercontent.com/${REPO}/${REF}/${t.path.split('/').map(encodeURIComponent).join('/')}`;
+    files.push({ name: t.path, text: await (await get(url)).text() });
+  }
   for (const path of paths) {
     const url = `https://raw.githubusercontent.com/${REPO}/${REF}/${path.split('/').map(encodeURIComponent).join('/')}`;
     files.push({ name: path, text: await (await get(url)).text() });
@@ -40,6 +51,22 @@ async function syncHistory(auto) {
 }
 
 async function saveHistory(files, source, auto) {
+  // MLB list files become dated snapshots; the rest are FanGraphs lists.
+  const mlbFiles = files.filter((f) => ProspectAsOf.mlbLabel(f.name));
+  files = files.filter((f) => !ProspectAsOf.mlbLabel(f.name));
+  let mlbLoaded = 0;
+  if (mlbFiles.length) {
+    const { mlbSnaps } = await chrome.storage.local.get('mlbSnaps');
+    const snaps = mlbSnaps || {};
+    for (const f of mlbFiles) {
+      const label = ProspectAsOf.mlbLabel(f.name);
+      if (snaps[label] && snaps[label].source === 'sync') continue; // a sync of that day is kept as read
+      snaps[label] = Object.assign(ProspectAsOf.mlbSnapshotFromCsv(label, ProspectParse.parseList(f.text)), { source: 'file' });
+      mlbLoaded++;
+    }
+    await chrome.storage.local.set({ mlbSnaps: snaps });
+    if (!files.length) return { snapshots: [], players: 0, skipped: [], mlbLists: mlbLoaded };
+  }
   const history = ProspectHistory.buildHistory(files, ProspectParse.parseList);
   if (!history.snapshots.length) throw new Error('no files named <year>r or <year>u');
   history.updatedAt = Date.now();
@@ -52,7 +79,7 @@ async function saveHistory(files, source, auto) {
     update.fg = { updatedAt: Date.now(), source: 'history', label: 'through ' + ProspectHistory.snapshotLabel(latest), players: ProspectHistory.latestList(history) };
   }
   await chrome.storage.local.set(update);
-  return { snapshots: history.snapshots.map((s) => s.key), players: history.players.length, skipped: history.skipped };
+  return { snapshots: history.snapshots.map((s) => s.key), players: history.players.length, skipped: history.skipped, mlbLists: mlbLoaded };
 }
 
 function syncOnce() {

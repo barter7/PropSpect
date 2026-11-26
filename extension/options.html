@@ -67,8 +67,21 @@
      <em>Sold prices</em> file with the downloaded CSV.</p>
   <div class="scroll" id="sales-wrap" hidden>
     <table>
-      <thead><tr><th>Sold</th><th>Player</th><th>Price</th><th>Card</th><th>Format</th><th>FV</th><th>Listing</th></tr></thead>
+      <thead><tr><th>Sold</th><th>Player</th><th>Price</th><th>Card</th><th>Format</th><th>Ranked then</th><th>Listing</th></tr></thead>
       <tbody id="sales-rows"></tbody>
+    </table>
+  </div>
+
+  <h2>Ranks on the sale date</h2>
+  <p>The CSV gives each sale the player's FanGraphs FV and ranks, and his MLB Pipeline ranks, from the lists that were
+     current on the day it sold. A list counts from the date below. FanGraphs dates are estimates (a year's Report comes
+     out club by club over the off-season, the Updated list in mid-season), so change any you know better. MLB lists named
+     by a day were read that day; past years' MLB lists are the preseason ones.</p>
+  <p class="muted" id="dates-current"></p>
+  <div class="scroll" id="dates-wrap" hidden>
+    <table>
+      <thead><tr><th>List</th><th>Counts from</th><th></th></tr></thead>
+      <tbody id="dates-rows"></tbody>
     </table>
   </div>
 
@@ -82,6 +95,8 @@
 
   <script src="src/match.js"></script>
   <script src="src/parse.js"></script>
+  <script src="src/history.js"></script>
+  <script src="src/asof.js"></script>
   <script src="src/cards.js"></script>
   <script src="src/sales.js"></script>
   <script src="options.js"></script>

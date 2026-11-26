@@ -225,9 +225,54 @@ test('reads card type, variant and numbering from a listing title', () => {
   assert.strictEqual(Cards.parseTitle('2025 Bowman Draft 1st Round Pick JJ Wetherholt CPA Purple /250', 'JJ Wetherholt').first_bowman, false);
   assert.strictEqual(Cards.parseTitle('2021 Bowman Chrome 1st Auto Signed 11/20/25 shipped', 'X Y').numbered_to, null, 'a date is not a serial');
   assert.strictEqual(Cards.parseTitle('2024 Bowman Chrome 1st Auto Franklin Arias 12/25 Orange', 'Franklin Arias').serial, 12);
+  assert.strictEqual(Cards.parseTitle('Dual Auto Kai Sato-Reyes / Dario Vance 2025 Bowman Sterling', 'Dario Vance').numbered_to, null,
+    'a slash between two names is not numbering');
+  assert.strictEqual(Cards.parseTitle('2025 Bowman Sterling Dual Auto A B / 25', 'A B').numbered_to, null);
+  assert.strictEqual(Cards.parseTitle('2025 Bowman Chrome Auto Gold #/50', 'A B').numbered_to, 50);
   assert.strictEqual(Cards.parseTitle('(3) Card Lot 2024 Bowman Chrome 1st Jesus Made Base + Refractor', 'Jesus Made').noise, 'lot');
   assert.strictEqual(Cards.parseTitle('2025 Bowman Chrome Jumbo Box Break Random Team PYT Blue Jays', 'A B').noise, 'break');
   assert.strictEqual(Cards.parseTitle('2025 Bowman Chrome Jumbo Box Break Random Team PYT Blue Jays', 'A B').variant, 'Base', 'Blue Jays is a team');
   assert.strictEqual(Cards.describeCard(Cards.parseTitle('2024 Bowman Chrome 1st Jesus Made Gold Refractor Auto /50 PSA 10', 'Jesus Made')),
     '1st Bowman Auto · Gold /50 · PSA 10');
+});
+
+const AsOf = require('../src/asof.js');
+test('finds the rankings current on a sale date', () => {
+  assert.strictEqual(AsOf.listDate('2025r'), '2025-01-01');
+  assert.strictEqual(AsOf.listDate('2025u'), '2025-08-01');
+  assert.strictEqual(AsOf.listDate('2025-preseason'), '2025-01-20');
+  assert.strictEqual(AsOf.listDate('2026-11-25'), '2026-11-25');
+  assert.strictEqual(AsOf.listDate('2025u', { '2025u': '2025-07-15' }), '2025-07-15');
+
+  const file = (name, rows) => ({ name, text: 'Name,Org,Pos,Top 100,Org Rk,FV,Sign Yr,playerId\n' + rows.join('\n') });
+  const clubs = ['NYY', 'BOS', 'TOR'];
+  const h = History.buildHistory([
+    file('2025r.csv', ['Dario Vance,PIT,SS,40,2,50,2022,sa1', ...clubs.map((c, i) => `Filler ${i},${c},C,,1,40,2020,f${i}`)]),
+    file('2025u.csv', ['Dario Vance,PIT,SS,12,1,55,2022,sa1', ...clubs.map((c, i) => `Filler ${i},${c},C,,1,40,2020,f${i}`)]),
+    file('2026r.csv', ['Kai Sato,NYY,C,,3,45,2024,sa9']), // being rolled out: only the Yankees so far
+  ], parseList);
+  const fg = (name, team, date) => AsOf.fgAt(h, name, team, date);
+  assert.strictEqual(fg('Dario Vance', 'PIT', '2024-12-31'), null, 'before any list');
+  assert.deepStrictEqual(fg('Dario Vance', 'PIT', '2025-03-01'), { list: '2025r', fv: '50', rank: 40, orgRank: 2 });
+  assert.deepStrictEqual(fg('Dario Vance', 'PIT', '2025-09-01'), { list: '2025u', fv: '55', rank: 12, orgRank: 1 });
+  assert.deepStrictEqual(fg('Dario Vance', 'PIT', '2026-03-01'), { list: '2025u', fv: '55', rank: 12, orgRank: 1 }, 'PIT has no 2026 list yet');
+  assert.deepStrictEqual(fg('Kai Sato', 'NYY', '2026-03-01'), { list: '2026r', fv: '45', rank: null, orgRank: 3 });
+  assert.deepStrictEqual(fg('Kai Sato', 'NYY', '2025-09-01'), { list: '2025u', fv: '', rank: null, orgRank: null }, 'not on that list');
+
+  const snaps = {
+    '2025-preseason': AsOf.mlbSnapshotFromCsv('2025-preseason', [{ name: 'Dario Vance', team: 'PIT', rank: 30, orgRank: 1 }]),
+    '2026-11-25': AsOf.mlbSnapshotFromCsv('2026-11-25', [{ name: 'Dario Vance', team: 'PIT', rank: 8, orgRank: 1 }]),
+  };
+  assert.deepStrictEqual(AsOf.mlbAt(snaps, 'Dario Vance', 'PIT', '2025-06-01'), { list: '2025-preseason', rank: 30, orgRank: 1 });
+  assert.deepStrictEqual(AsOf.mlbAt(snaps, 'Dario Vance', 'PIT', '2026-11-26'), { list: '2026-11-25', rank: 8, orgRank: 1 });
+  assert.deepStrictEqual(AsOf.mlbAt(snaps, 'Dario Vance', 'PIT', '2026-10-01'), { list: '2026-11-25 (read after the sale)', rank: 8, orgRank: 1 });
+  assert.strictEqual(AsOf.mlbAt(snaps, 'Dario Vance', 'PIT', '2026-05-01'), null, 'preseason 2025 too old, 2026-11-25 too far after');
+  assert.deepStrictEqual(AsOf.mlbAt(snaps, 'Nobody Here', 'PIT', '2025-06-01'), { list: '2025-preseason', rank: null, orgRank: null });
+  assert.strictEqual(AsOf.mlbLabel('Rankings/mlb-pipeline/2024-preseason.csv'), '2024-preseason');
+  assert.strictEqual(AsOf.mlbLabel('2026-11-25.csv'), '2026-11-25');
+  assert.strictEqual(AsOf.mlbLabel('2025u.csv'), '');
+
+  const row = AsOf.atSale({ player: 'Dario Vance', team: 'PIT', sold_date: '2025-09-01' }, { history: h, mlbSnaps: snaps });
+  assert.deepStrictEqual(row, { fg_list_at_sale: '2025u', fg_fv_at_sale: '55', fg_rank_at_sale: 12, fg_org_rank_at_sale: 1,
+    mlb_list_at_sale: '2025-preseason', mlb_rank_at_sale: 30, mlb_org_rank_at_sale: 1 });
 });

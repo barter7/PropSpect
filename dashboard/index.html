@@ -238,6 +238,7 @@
   <details id="pb-notes">
     <summary>How to read the lists</summary>
     <p>List names are a year plus a letter. <b>r</b> is that year's Report, the baseline list for the cycle. <b>u</b> is the Updated list, revised later for new performance, draft and trade movement, and graduations. FanGraphs revises one club at a time, so "on a current list" means the player is on the newest list his club appears in.</p>
+    <p>Each sale also carries the player's FanGraphs FV and ranks, and MLB Pipeline ranks, from the lists current on the day it sold. Point at them in a player's sales for which lists those were.</p>
     <p><b>Sold</b> and <b>Median sold</b> come from the sold eBay listings the Prospect Rank extension saved while you browsed eBay's Sold results. The median mixes every kind of card (base, refractors, autographs), and leaves out Best Offer sales, where eBay shows only the asking price. To update them, download the CSV from the extension's settings and replace the <i>Sold prices</i> file in Sources.</p>
     <p>A Top 100 rank can run past 100 because FanGraphs ranks every player graded 50 FV or better. Players are followed from list to list by their FanGraphs player id, and by name and signing year when the id is missing or changed.</p>
   </details>
@@ -733,7 +734,7 @@
     const table = document.createElement('table');
     const col = (w) => Object.assign(document.createElement('col'), { style: `width:${w}` });
     const cg = document.createElement('colgroup');
-    cg.append(col('84px'), col('86px'), col('34%'), Object.assign(col('auto'), { className: 'pb-title' }));
+    cg.append(col('84px'), col('86px'), col('28%'), col('22%'), Object.assign(col('auto'), { className: 'pb-title' }));
     table.appendChild(cg);
     for (const s of list.slice(0, 8)) {
       const tr = document.createElement('tr');
@@ -751,7 +752,12 @@
       k.textContent = [String(s.first_bowman) === 'yes' ? '1st' : '', String(s.auto) === 'yes' ? 'Auto' : '', cardLabel(s),
         s.grader ? `${s.grader} ${s.grade}` : ''].filter(Boolean).join(' · ');
       k.title = k.textContent;
-      tr.append(d, p, k, t);
+      // His rankings on the day it sold (from the lists current then), as the extension exported them.
+      const then = Object.assign(document.createElement('td'), { className: 'pb-k' });
+      const mlbThen = num(s.mlb_rank_at_sale) != null ? `MLB #${num(s.mlb_rank_at_sale)}` : num(s.mlb_org_rank_at_sale) != null ? `MLB org #${num(s.mlb_org_rank_at_sale)}` : '';
+      then.textContent = [s.fg_fv_at_sale ? `${s.fg_fv_at_sale} FV` : '', mlbThen].filter(Boolean).join(' · ');
+      then.title = [s.fg_list_at_sale && `FanGraphs list: ${s.fg_list_at_sale}`, s.mlb_list_at_sale && `MLB list: ${s.mlb_list_at_sale}`].filter(Boolean).join('; ');
+      tr.append(d, p, k, then, t);
       table.appendChild(tr);
     }
     wrap.insertBefore(chips, null);
